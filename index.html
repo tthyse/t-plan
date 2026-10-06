@@ -1604,84 +1604,133 @@ async function lookupFlight(id) {
   if (!date)     { showToast(t("enterDate"));     return; }
 
   const btn = document.getElementById("lb-" + id);
-  const statusEl = document.getElementById("ls-" + id);
   setLookupStatus(id, "loading", t("lookupSearching"));
   btn.disabled = true;
 
-  // AviationStack free tier only supports HTTP — use a CORS proxy for browser requests
-  // allorigins.win is a reliable free proxy that rewrites to HTTPS internally
-  const iataCode = flightNo.replace(/[0-9]/g, "").toUpperCase();
-  const flightNum = flightNo.replace(/[^0-9]/g, "");
-  const apiUrl = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${encodeURIComponent(flightNo)}&flight_date=${date}`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+  // Build the AviationStack API URL
+  // Try HTTPS first (works on paid plans), fall back to HTTP via proxies
+  const httpsUrl = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${encodeURIComponent(flightNo)}&flight_date=${date}`;
+  const httpUrl  = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${encodeURIComponent(flightNo)}&flight_date=${date}`;
 
-  try {
-    const res  = await fetch(proxyUrl);
-    if (!res.ok) throw new Error("Proxy request failed: " + res.status);
-    const outer = await res.json();
-    const data  = JSON.parse(outer.contents);
+  // CORS proxy list — tried in order until one works
+  const proxies = [
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+    u => `https://cors-anywhere.herokuapp.com/${u}`,
+  ];
 
-    if (data.error) {
-      const msg = data.error.message || t("lookupFailed");
-      setLookupStatus(id, "error", msg);
-      btn.disabled = false;
-      return;
-    }
-
-    const flights = data.data || [];
-    if (flights.length === 0) {
-      setLookupStatus(id, "error", t("lookupNoResult"));
-      btn.disabled = false;
-      return;
-    }
-
-    // Pick the best match (first result, or match on date)
-    const match = flights.find(fl => fl.flight_date === date) || flights[0];
-
-    // Extract and map fields
-    const airline   = match.airline?.name || "";
-    const from      = match.departure?.iata || "";
-    const to        = match.arrival?.iata   || "";
-    const deptSched = match.departure?.scheduled || "";
-    const arrSched  = match.arrival?.scheduled   || "";
-    const terminal  = match.departure?.terminal  || f.terminal || "";
-    const gate      = match.departure?.gate      || "";
-
-    // Parse ISO datetime strings → date + time parts
-    function parseISO(iso) {
-      if (!iso) return { date: "", time: "" };
-      const d = new Date(iso);
-      const dateStr = d.toISOString().slice(0, 10);
-      const timeStr = d.toTimeString().slice(0, 5);
-      return { date: dateStr, time: timeStr };
-    }
-
-    const dept = parseISO(deptSched);
-    const arr  = parseISO(arrSched);
-
-    // Apply to state
-    const updates = {
-      airline,
-      flightNo:  match.flight?.iata || flightNo,
-      from,
-      to,
-      departDate: dept.date || date,
-      departTime: dept.time,
-      arriveDate: arr.date,
-      arriveTime: arr.time,
-      terminal:  terminal + (gate ? " / Gate " + gate : ""),
-    };
-    Object.assign(f, updates);
-
-    renderFlights();
-    scheduleSave();
-    setLookupStatus(id, "success",
-      `✅ ${airline} ${from} → ${to}  ${dept.time ? fmtTime(dept.time) : ""} → ${arr.time ? fmtTime(arr.time) : ""}`);
-
-  } catch(e) {
-    console.error("Flight lookup error:", e);
-    setLookupStatus(id, "error", t("lookupFailed") + ": " + e.message);
+  // Helper: fetch through a proxy and unwrap the response
+  async function fetchViaProxy(proxyFn, targetUrl) {
+    const proxyUrl = proxyFn(targetUrl);
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    // allorigins wraps in { contents: "..." }
+    try {
+      const outer = JSON.parse(text);
+      if (outer.contents) return JSON.parse(outer.contents);
+      return outer;
+    } catch { return JSON.parse(text); }
   }
+
+  let data = null;
+  let lastError = "";
+
+  // 1. Try direct HTTPS first (works if plan supports it)
+  try {
+    const res = await fetch(httpsUrl, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      data = await res.json();
+    }
+  } catch(e) {
+    lastError = e.message;
+  }
+
+  // 2. Try each proxy with HTTP URL
+  if (!data) {
+    for (const proxyFn of proxies) {
+      try {
+        data = await fetchViaProxy(proxyFn, httpUrl);
+        if (data) break;
+      } catch(e) {
+        lastError = e.message;
+        continue;
+      }
+    }
+  }
+
+  // 3. Try proxies with HTTPS URL as last resort
+  if (!data) {
+    for (const proxyFn of proxies) {
+      try {
+        data = await fetchViaProxy(proxyFn, httpsUrl);
+        if (data) break;
+      } catch(e) {
+        lastError = e.message;
+        continue;
+      }
+    }
+  }
+
+  if (!data) {
+    setLookupStatus(id, "error", t("lookupFailed") + " — " + lastError);
+    btn.disabled = false;
+    return;
+  }
+
+  if (data.error) {
+    setLookupStatus(id, "error", data.error.message || t("lookupFailed"));
+    btn.disabled = false;
+    return;
+  }
+
+  const flights = data.data || [];
+  if (flights.length === 0) {
+    setLookupStatus(id, "error", t("lookupNoResult"));
+    btn.disabled = false;
+    return;
+  }
+
+  // Pick best match — prefer exact date match
+  const match = flights.find(fl => fl.flight_date === date) || flights[0];
+
+  // Extract fields
+  const airline   = match.airline?.name || "";
+  const from      = match.departure?.iata || "";
+  const to        = match.arrival?.iata   || "";
+  const deptSched = match.departure?.scheduled || "";
+  const arrSched  = match.arrival?.scheduled   || "";
+  const terminal  = match.departure?.terminal  || f.terminal || "";
+  const gate      = match.departure?.gate      || "";
+
+  function parseISO(iso) {
+    if (!iso) return { date: "", time: "" };
+    const d = new Date(iso);
+    return {
+      date: d.toISOString().slice(0, 10),
+      time: d.toTimeString().slice(0, 5),
+    };
+  }
+
+  const dept = parseISO(deptSched);
+  const arr  = parseISO(arrSched);
+
+  Object.assign(f, {
+    airline,
+    flightNo:   match.flight?.iata || flightNo,
+    from,
+    to,
+    departDate: dept.date || date,
+    departTime: dept.time,
+    arriveDate: arr.date,
+    arriveTime: arr.time,
+    terminal:   terminal + (gate ? " / Gate " + gate : ""),
+  });
+
+  renderFlights();
+  scheduleSave();
+  setLookupStatus(id, "success",
+    `✅ ${airline} ${from} → ${to}  ${dept.time ? fmtTime(dept.time) : ""} → ${arr.time ? fmtTime(arr.time) : ""}`);
 
   btn.disabled = false;
 }
