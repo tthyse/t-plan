@@ -111,6 +111,8 @@ body {
 .btn-primary:hover { background: var(--primary-dark); }
 .btn-danger  { background: #fc8181; color: #fff; }
 .btn-danger:hover  { background: #f56565; }
+.btn-reset   { background: transparent; color: #fed7d7; border: 1.5px solid rgba(255,150,150,.5); }
+.btn-reset:hover   { background: rgba(252,129,129,.2); color: #fff; border-color: #fc8181; }
 .btn-sm { padding: 4px 10px; font-size: 0.78rem; }
 
 /* ── Language picker ──────────────────────────────────────────────────────── */
@@ -389,6 +391,7 @@ body.view-mode #infoBanner { display: flex; }
       <button class="btn btn-white" onclick="exportPDF()">📄 <span data-i18n="pdf">PDF</span></button>
       <button class="btn btn-white" onclick="openShare()">🔗 <span data-i18n="share">Share</span></button>
       <button class="btn btn-outline" onclick="openTripSetup()">⚙️ <span data-i18n="setup">Setup</span></button>
+      <button class="btn btn-reset" onclick="confirmReset()">🗑 <span data-i18n="reset">Reset</span></button>
     </div>
   </div>
 </div>
@@ -548,6 +551,8 @@ const I18N = {
     savedLocal: "Saved locally",
     pdfExporting: "Generating PDF...",
     day: "Day",
+    reset: "Reset",
+    resetConfirm: "Reset everything? This will clear all flights, days and trip details. This cannot be undone.",
   },
   zh: {
     flightSchedule: "航班行程",
@@ -610,6 +615,8 @@ const I18N = {
     savedLocal: "已本地保存",
     pdfExporting: "正在生成PDF...",
     day: "第",
+    reset: "重置",
+    resetConfirm: "重置所有内容？这将清除所有航班、日程和行程详情，且无法撤销。",
   },
   ko: {
     flightSchedule: "항공 일정",
@@ -672,6 +679,8 @@ const I18N = {
     savedLocal: "로컬 저장됨",
     pdfExporting: "PDF 생성 중...",
     day: "Day",
+    reset: "초기화",
+    resetConfirm: "모든 항목을 초기화하시겠습니까? 모든 항공편, 일정 및 여행 정보가 삭제되며 되돌릴 수 없습니다.",
   },
   ja: {
     flightSchedule: "フライトスケジュール",
@@ -734,6 +743,8 @@ const I18N = {
     savedLocal: "ローカルに保存済み",
     pdfExporting: "PDFを生成中...",
     day: "Day",
+    reset: "リセット",
+    resetConfirm: "すべてをリセットしますか？すべてのフライト、日程、旅行情報が削除され、元に戻すことはできません。",
   },
   fr: {
     flightSchedule: "Programme de vol",
@@ -771,6 +782,7 @@ const I18N = {
     addDinner: "Ajouter dîner...", addNight: "Activités soirée...",
     saved: "Sauvegardé", saving: "Sauvegarde...", savedLocal: "Sauvegardé localement",
     pdfExporting: "Génération PDF...", day: "Jour",
+    reset: "Réinitialiser", resetConfirm: "Tout réinitialiser ? Cela effacera tous les vols, jours et détails du voyage. Irréversible.",
   },
   de: {
     flightSchedule: "Flugplan", addFlight: "Flug hinzufügen", addDay: "Tag hinzufügen",
@@ -798,6 +810,7 @@ const I18N = {
     addDinner: "Abendessen hinzufügen...", addNight: "Abend hinzufügen...",
     saved: "Gespeichert", saving: "Speichern...", savedLocal: "Lokal gespeichert",
     pdfExporting: "PDF erstellen...", day: "Tag",
+    reset: "Zurücksetzen", resetConfirm: "Alles zurücksetzen? Alle Flüge, Tage und Reisedetails werden gelöscht. Nicht rückgängig zu machen.",
   },
   es: {
     flightSchedule: "Itinerario de vuelos", addFlight: "Agregar vuelo", addDay: "Agregar día",
@@ -825,6 +838,7 @@ const I18N = {
     addDinner: "Agregar cena...", addNight: "Agregar actividades nocturnas...",
     saved: "Guardado", saving: "Guardando...", savedLocal: "Guardado localmente",
     pdfExporting: "Generando PDF...", day: "Día",
+    reset: "Reiniciar", resetConfirm: "¿Reiniciar todo? Se eliminarán todos los vuelos, días y detalles del viaje. No se puede deshacer.",
   },
   th: {
     flightSchedule: "ตารางบิน", addFlight: "เพิ่มเที่ยวบิน", addDay: "เพิ่มวัน",
@@ -852,6 +866,7 @@ const I18N = {
     addDinner: "เพิ่มอาหารเย็น...", addNight: "เพิ่มกิจกรรมกลางคืน...",
     saved: "บันทึกแล้ว", saving: "กำลังบันทึก...", savedLocal: "บันทึกในเครื่อง",
     pdfExporting: "กำลังสร้าง PDF...", day: "วันที่",
+    reset: "รีเซ็ต", resetConfirm: "รีเซ็ตทั้งหมด? ข้อมูลเที่ยวบิน วันและรายละเอียดทั้งหมดจะถูกลบ ไม่สามารถกู้คืนได้",
   },
 };
 
@@ -902,18 +917,17 @@ function getOrCreateTripId() {
   const params = new URLSearchParams(window.location.search);
   let id = params.get("trip");
   if (!id) {
-    // Try to recover the last-used ID from localStorage (survives refresh on local file)
+    // Recover the last-used trip ID from localStorage (survives refresh on local file)
     id = localStorage.getItem("tp_lastId") || null;
   }
   if (!id) {
     id = "trip_" + Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
   }
-  // Always keep the URL in sync so sharing works
-  const newUrl = window.location.pathname + "?trip=" + id;
-  if (!window.location.search.includes(id)) {
-    window.history.replaceState({}, "", newUrl);
-  }
-  // Persist the ID so refreshes without a URL param still recover it
+  // Update URL — preserve ALL existing params, just set/update the trip param
+  const url = new URL(window.location.href);
+  url.searchParams.set("trip", id);
+  window.history.replaceState({}, "", url.toString());
+  // Persist so refreshes without a URL param still recover it
   try { localStorage.setItem("tp_lastId", id); } catch(e) {}
   return id;
 }
@@ -955,9 +969,11 @@ async function doSave() {
   try { localStorage.setItem("tp_" + tripId, JSON.stringify(data)); } catch(e) {}
 
   // ── JSONBin cloud save ──────────────────────────────────────────────────
-  // Uses the bin ID stored alongside the trip ID.
+  // Uses the bin ID stored in localStorage and the URL ?bin= param.
   // First save creates the bin; subsequent saves update it.
-  const binId = localStorage.getItem("tp_bin_" + tripId);
+  const binId = localStorage.getItem("tp_bin_" + tripId)
+             || localStorage.getItem("tp_binId")
+             || new URLSearchParams(window.location.search).get("bin");
   try {
     let res;
     if (binId) {
@@ -968,7 +984,7 @@ async function doSave() {
         body: JSON.stringify(data)
       });
     } else {
-      // Create new bin (public = true so anyone with bin ID can read without API key)
+      // Create new public bin (no API key required to read)
       res = await fetch("https://api.jsonbin.io/v3/b", {
         method: "POST",
         headers: {
@@ -982,7 +998,9 @@ async function doSave() {
         const json = await res.json();
         const newBinId = json.metadata?.id;
         if (newBinId) {
+          // Store under both keys for resilience
           localStorage.setItem("tp_bin_" + tripId, newBinId);
+          localStorage.setItem("tp_binId", newBinId);
           // Embed bin ID into the URL so shared recipients can also load it
           const url = new URL(window.location.href);
           url.searchParams.set("bin", newBinId);
@@ -1014,13 +1032,17 @@ async function doSave() {
 }
 
 async function loadFromCloud() {
-  // Check URL for a bin ID (present when opening a shared link)
+  // Check URL for a bin ID (present when opening a shared link or after first save)
   const params = new URLSearchParams(window.location.search);
   const urlBinId = params.get("bin");
   if (urlBinId) {
     localStorage.setItem("tp_bin_" + tripId, urlBinId);
+    localStorage.setItem("tp_binId", urlBinId);
   }
-  const binId = urlBinId || localStorage.getItem("tp_bin_" + tripId);
+  // Try all three places the bin ID might be stored
+  const binId = urlBinId
+             || localStorage.getItem("tp_bin_" + tripId)
+             || localStorage.getItem("tp_binId");
 
   if (binId) {
     try {
@@ -1360,6 +1382,41 @@ function saveTripSetup() {
   closeModal("setupModal");
   renderTripMeta();
   scheduleSave();
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function confirmReset() {
+  if (!confirm(t("resetConfirm"))) return;
+
+  // Clear state
+  state.trip = { name: "New Trip", country: "", travelers: [], startDate: "", endDate: "" };
+  state.flights = [{
+    id: uid(), type: "direct",
+    airline: "", flightNo: "", from: "", to: "",
+    departDate: "", departTime: "", arriveDate: "", arriveTime: "",
+    terminal: "", seats: "",
+  }];
+  state.days = [];
+
+  // Clear localStorage for this trip
+  try {
+    localStorage.removeItem("tp_" + tripId);
+    localStorage.removeItem("tp_bin_" + tripId);
+    localStorage.removeItem("tp_binId");
+    localStorage.removeItem("tp_lastId");
+  } catch(e) {}
+
+  // Generate a fresh trip ID so the old shared link no longer overwrites
+  tripId = "trip_" + Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
+  try { localStorage.setItem("tp_lastId", tripId); } catch(e) {}
+  const url = new URL(window.location.href);
+  url.searchParams.set("trip", tripId);
+  url.searchParams.delete("bin");
+  window.history.replaceState({}, "", url.toString());
+
+  renderAll();
+  scheduleSave();
+  showToast("✅ Trip reset.");
 }
 
 // ── Share ─────────────────────────────────────────────────────────────────────
