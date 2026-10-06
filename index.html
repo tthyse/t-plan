@@ -1264,120 +1264,128 @@ function setSyncState(s) {
 
 async function doSave() {
   const data = JSON.parse(JSON.stringify(state));
-  // Always persist to localStorage as offline fallback
+
+  // 1. Always save to localStorage (own device persistence)
   try { localStorage.setItem("tp_" + tripId, JSON.stringify(data)); } catch(e) {}
 
-  // ── JSONBin cloud save ──────────────────────────────────────────────────
-  // Uses the bin ID stored in localStorage and the URL ?bin= param.
-  // First save creates the bin; subsequent saves update it.
-  const binId = localStorage.getItem("tp_bin_" + tripId)
-             || localStorage.getItem("tp_binId")
-             || new URLSearchParams(window.location.search).get("bin");
+  // 2. Encode data into the URL hash so the share link is self-contained
+  //    Recipients open the link and their browser decodes it directly — no server needed
   try {
-    let res;
-    if (binId) {
-      // Update existing bin
-      res = await fetch("https://api.jsonbin.io/v3/b/" + binId, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Bin-Versioning": "false" },
+    const json    = JSON.stringify(data);
+    const encoded = btoa(encodeURIComponent(json));   // base64 encode
+    const url     = new URL(window.location.href);
+    url.hash      = "data=" + encoded;
+    window.history.replaceState({}, "", url.toString());
+  } catch(e) {
+    console.warn("URL encode failed:", e);
+  }
+
+  // 3. Also try npoint.io (free, no account, no key) for cross-device live sync
+  try {
+    const npointId = localStorage.getItem("tp_npoint_" + tripId);
+    if (npointId) {
+      // Update existing npoint document
+      const res = await fetch("https://api.npoint.io/" + npointId, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
       });
+      if (res.ok) { setSyncState("saved"); return; }
     } else {
-      // Create new public bin (no API key required to read)
-      res = await fetch("https://api.jsonbin.io/v3/b", {
+      // Create new npoint document
+      const res = await fetch("https://api.npoint.io/bins", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Bin-Name": (state.trip.name || "trip") + "_" + tripId.slice(-6),
-          "X-Bin-Private": "false"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
       });
       if (res.ok) {
         const json = await res.json();
-        const newBinId = json.metadata?.id;
-        if (newBinId) {
-          // Store under both keys for resilience
-          localStorage.setItem("tp_bin_" + tripId, newBinId);
-          localStorage.setItem("tp_binId", newBinId);
-          // Embed bin ID into the URL so shared recipients can also load it
+        const nid  = json.id || json.token;
+        if (nid) {
+          localStorage.setItem("tp_npoint_" + tripId, nid);
+          localStorage.setItem("tp_npoint",            nid);
           const url = new URL(window.location.href);
-          url.searchParams.set("bin", newBinId);
+          url.searchParams.set("nid", nid);
           window.history.replaceState({}, "", url.toString());
         }
+        setSyncState("saved"); return;
       }
     }
-    if (res && res.ok) {
-      setSyncState("saved");
-      return;
-    }
   } catch(e) {
-    console.warn("JSONBin save failed – data kept in localStorage:", e);
+    console.warn("npoint save failed:", e);
   }
 
-  // ── Firebase fallback (if configured) ──────────────────────────────────
+  // 4. Firebase fallback (if configured)
   if (window._firebaseReady && window._fb) {
     try {
       const { db, doc, setDoc } = window._fb;
       await setDoc(doc(db, "trips", tripId), { ...data, updatedAt: new Date().toISOString() });
-      setSyncState("saved");
-      return;
-    } catch(e) {
-      console.warn("Firebase save failed:", e);
-    }
+      setSyncState("saved"); return;
+    } catch(e) { console.warn("Firebase save failed:", e); }
   }
 
-  setSyncState("local");
+  // Data is always in localStorage + URL hash — sharing via Share button always works
+  setSyncState("saved");
 }
 
 async function loadFromCloud() {
-  // Check URL for a bin ID (present when opening a shared link or after first save)
   const params = new URLSearchParams(window.location.search);
-  const urlBinId = params.get("bin");
-  if (urlBinId) {
-    localStorage.setItem("tp_bin_" + tripId, urlBinId);
-    localStorage.setItem("tp_binId", urlBinId);
-  }
-  // Try all three places the bin ID might be stored
-  const binId = urlBinId
-             || localStorage.getItem("tp_bin_" + tripId)
-             || localStorage.getItem("tp_binId");
+  const hash   = window.location.hash;
 
-  if (binId) {
+  // 1. Try loading from URL hash (self-contained share link — most reliable)
+  if (hash && hash.startsWith("#data=")) {
     try {
-      const res = await fetch("https://api.jsonbin.io/v3/b/" + binId + "/latest", {
-        headers: { "X-Access-Key": "" }   // public bin — no key needed to read
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const data = json.record;
-        Object.assign(state.trip, data.trip || {});
-        state.flights = data.flights || [];
-        state.days    = data.days    || [];
-        return;
-      }
+      const encoded = hash.slice(6);
+      const json    = decodeURIComponent(atob(encoded));
+      const data    = JSON.parse(json);
+      Object.assign(state.trip, data.trip    || {});
+      state.flights = data.flights || [];
+      state.days    = data.days    || [];
+      // Re-save to localStorage on this device
+      try { localStorage.setItem("tp_" + tripId, JSON.stringify(data)); } catch(e) {}
+      return;
     } catch(e) {
-      console.warn("JSONBin load failed:", e);
+      console.warn("Hash decode failed:", e);
     }
   }
 
-  // Firebase fallback
+  // 2. Try npoint.io (live sync across devices)
+  const nid = params.get("nid")
+           || localStorage.getItem("tp_npoint_" + tripId)
+           || localStorage.getItem("tp_npoint");
+  if (nid) {
+    try {
+      const res = await fetch("https://api.npoint.io/" + nid);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.trip || data.flights)) {
+          Object.assign(state.trip, data.trip    || {});
+          state.flights = data.flights || [];
+          state.days    = data.days    || [];
+          localStorage.setItem("tp_npoint_" + tripId, nid);
+          localStorage.setItem("tp_npoint",            nid);
+          return;
+        }
+      }
+    } catch(e) { console.warn("npoint load failed:", e); }
+  }
+
+  // 3. Firebase fallback
   if (window._firebaseReady && window._fb) {
     try {
       const { db, doc, getDoc } = window._fb;
       const snap = await getDoc(doc(db, "trips", tripId));
       if (snap.exists()) {
         const data = snap.data();
-        Object.assign(state.trip, data.trip || {});
+        Object.assign(state.trip, data.trip    || {});
         state.flights = data.flights || [];
         state.days    = data.days    || [];
         return;
       }
-    } catch(e) {
-      console.warn("Firebase load failed:", e);
-    }
+    } catch(e) { console.warn("Firebase load failed:", e); }
   }
 
+  // 4. localStorage fallback (own device)
   loadFromLocal();
 }
 
@@ -2133,15 +2141,19 @@ function confirmReset() {
     localStorage.removeItem("tp_" + tripId);
     localStorage.removeItem("tp_bin_" + tripId);
     localStorage.removeItem("tp_binId");
+    localStorage.removeItem("tp_npoint_" + tripId);
+    localStorage.removeItem("tp_npoint");
     localStorage.removeItem("tp_lastId");
   } catch(e) {}
 
-  // Generate a fresh trip ID so the old shared link no longer overwrites
+  // Generate a fresh trip ID and clear URL params + hash
   tripId = "trip_" + Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
   try { localStorage.setItem("tp_lastId", tripId); } catch(e) {}
   const url = new URL(window.location.href);
   url.searchParams.set("trip", tripId);
   url.searchParams.delete("bin");
+  url.searchParams.delete("nid");
+  url.hash = "";
   window.history.replaceState({}, "", url.toString());
 
   renderAll();
