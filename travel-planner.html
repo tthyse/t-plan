@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Travel Planner</title>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ── Firebase project config ───────────────────────────────────────────────
+  // Replace these values with your own Firebase project config.
+  // Create a free project at https://console.firebase.google.com/
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId:         "YOUR_PROJECT_ID",
+    storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  let app, db, auth;
+  let firebaseReady = false;
+
+  try {
+    app  = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db   = getFirestore(app);
+    window._fb = { db, auth, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, signInAnonymously, onAuthStateChanged };
+    firebaseReady = true;
+  } catch(e) {
+    console.warn("Firebase init failed – running in local-only mode.", e);
+  }
+
+  window._firebaseReady = firebaseReady;
+  document.dispatchEvent(new Event("firebaseReady"));
+</script>
+
+<!-- html2pdf -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+/* ── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #00b4d8;
+  --primary-dark: #0077b6;
+  --primary-light: #90e0ef;
+  --accent: #48cae4;
+  --bg: #f0f4f8;
+  --card: #ffffff;
+  --border: #d1d9e0;
+  --text: #1a202c;
+  --text-muted: #718096;
+  --green-light: #e6fff8;
+  --green-border: #81e6d9;
+  --status-booked: #48bb78;
+  --status-scheduled: #4299e1;
+  --status-nobook: #fc8181;
+  --status-tbc: #f6ad55;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC",
+               "Noto Sans KR", "Noto Sans JP", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+}
+
+/* ── Top Bar ──────────────────────────────────────────────────────────────── */
+#topBar {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  color: #fff;
+  padding: 14px 20px 10px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,80,0.18);
+}
+#topBar h1 {
+  font-size: 1.25rem; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+}
+#topBar h1 span.edit-pencil { font-size: 0.85rem; opacity: .7; }
+#tripMeta { font-size: 0.82rem; opacity: .85; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+#tripMeta span { display: flex; align-items: center; gap: 3px; }
+#topActions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 20px; font-size: 0.82rem;
+  font-weight: 600; cursor: pointer; border: none; transition: all .18s;
+}
+.btn-white  { background: #fff; color: var(--primary-dark); }
+.btn-white:hover { background: #e8f7fb; }
+.btn-outline { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.6); }
+.btn-outline:hover { background: rgba(255,255,255,.15); }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-danger  { background: #fc8181; color: #fff; }
+.btn-danger:hover  { background: #f56565; }
+.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+
+/* ── Language picker ──────────────────────────────────────────────────────── */
+#langSelect {
+  padding: 5px 10px; border-radius: 16px; border: 1.5px solid rgba(255,255,255,.5);
+  background: transparent; color: #fff; font-size: 0.82rem; cursor: pointer;
+  appearance: none; padding-right: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='white'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center;
+}
+#langSelect option { background: var(--primary-dark); }
+
+/* ── Sync indicator ───────────────────────────────────────────────────────── */
+#syncStatus {
+  font-size: 0.75rem; padding: 3px 10px; border-radius: 10px;
+  background: rgba(255,255,255,.15); color: #fff; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #68d391; flex-shrink: 0; }
+.sync-dot.saving { background: #f6ad55; animation: blink .7s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Info banner ──────────────────────────────────────────────────────────── */
+#infoBanner {
+  background: #ebf8ff; border: 1px solid #90cdf4;
+  padding: 10px 18px; font-size: 0.82rem; color: #2b6cb0;
+  display: flex; align-items: flex-start; gap: 8px;
+  border-radius: 0;
+}
+#infoBanner.hidden { display: none; }
+#infoBanner button { margin-left: auto; background: none; border: none; cursor: pointer; color: #718096; font-size: 1rem; }
+
+/* ── Main content ─────────────────────────────────────────────────────────── */
+#main { max-width: 860px; margin: 0 auto; padding: 20px 14px 60px; }
+
+/* ── Section card ─────────────────────────────────────────────────────────── */
+.section-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); margin-bottom: 22px; overflow: hidden;
+}
+.section-header {
+  background: linear-gradient(90deg, #f7fafc, #eef6fb);
+  padding: 12px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border); font-weight: 700; font-size: 1.05rem;
+}
+.section-header .icon { font-size: 1.3rem; }
+
+/* ── Flight card ──────────────────────────────────────────────────────────── */
+.flight-segment {
+  padding: 14px 18px; border-bottom: 1px solid #edf2f7;
+}
+.flight-segment:last-child { border-bottom: none; }
+.flight-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 12px; font-size: 0.78rem;
+  font-weight: 700; margin-bottom: 10px;
+}
+.tag-direct     { background: #ebf8ff; color: #2b6cb0; }
+.tag-connecting { background: #fefcbf; color: #744210; }
+.flight-route {
+  display: flex; align-items: center; gap: 8px; font-weight: 700;
+  font-size: 1.05rem; color: var(--primary-dark); margin-bottom: 10px;
+}
+.field-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+@media(max-width:500px){ .field-grid { grid-template-columns: 1fr; } }
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-size: 0.74rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.field-input {
+  border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px;
+  font-size: 0.9rem; font-family: inherit; background: #fff; color: var(--text);
+  transition: border-color .15s, box-shadow .15s; width: 100%;
+}
+.field-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,180,216,.12); }
+.add-flight-btn {
+  display: block; width: 100%; padding: 10px; text-align: center;
+  background: #f7fafc; border: 2px dashed var(--border); border-radius: 0 0 var(--radius) var(--radius);
+  color: var(--primary); font-weight: 600; cursor: pointer; font-size: 0.9rem;
+  transition: background .15s;
+}
+.add-flight-btn:hover { background: #ebf8ff; }
+
+/* ── Day card ─────────────────────────────────────────────────────────────── */
+.day-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; }
+.day-header {
+  background: linear-gradient(90deg, #ebf8ff, #e0f7fa);
+  padding: 10px 18px 0;
+  border-bottom: 2px solid var(--primary-light);
+  display: flex; flex-direction: column; gap: 0;
+}
+.day-header-top {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-bottom: 8px;
+}
+.day-badge {
+  background: var(--primary); color: #fff; border-radius: 20px;
+  padding: 3px 12px; font-size: 0.82rem; font-weight: 700; white-space: nowrap;
+  flex-shrink: 0;
+}
+.day-date { font-weight: 700; font-size: 1.05rem; color: var(--primary-dark); flex: 1; }
+.day-theme-row {
+  padding: 6px 0 10px; border-top: 1px solid rgba(0,180,216,.12);
+}
+.day-theme-input {
+  width: 100%; border: none; background: transparent; font-size: 0.92rem;
+  font-family: inherit; color: var(--text); outline: none;
+  padding: 2px 0; resize: none; overflow: hidden; min-height: 26px;
+  line-height: 1.5; display: block;
+}
+.day-theme-input::placeholder { color: var(--text-muted); font-style: italic; }
+.day-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ── Activity row ─────────────────────────────────────────────────────────── */
+.activity-row {
+  padding: 10px 18px; border-bottom: 1px solid #f0f4f8;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.activity-row:last-child { border-bottom: none; }
+.activity-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.activity-title {
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 700; font-size: 0.92rem;
+}
+.activity-title .icon { font-size: 1.1rem; }
+.status-select {
+  padding: 4px 28px 4px 10px; border-radius: 14px; font-size: 0.78rem;
+  font-weight: 600; border: 1.5px solid var(--border); cursor: pointer;
+  background: #fff; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23718096'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+  min-width: 130px; transition: all .15s;
+}
+.status-select.booked   { background-color: #f0fff4; border-color: var(--status-booked);   color: #276749; }
+.status-select.scheduled{ background-color: #ebf8ff; border-color: var(--status-scheduled); color: #2c5282; }
+.status-select.nobook   { background-color: #fff5f5; border-color: var(--status-nobook);   color: #c53030; }
+.status-select.tbc      { background-color: #fffaf0; border-color: var(--status-tbc);      color: #7b341e; }
+
+.activity-textarea {
+  width: 100%; border: 1px solid var(--green-border); border-radius: 7px;
+  background: var(--green-light); padding: 8px 10px; font-size: 0.88rem;
+  font-family: inherit; resize: vertical; min-height: 44px;
+  color: var(--text); transition: border-color .15s, box-shadow .15s;
+}
+.activity-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,180,216,.10); }
+.activity-textarea::placeholder { color: #a0aec0; }
+
+/* ── Add day bar ──────────────────────────────────────────────────────────── */
+#addDayBar {
+  text-align: center; padding: 18px 0;
+}
+#addDayBar .btn { font-size: 0.95rem; padding: 10px 28px; border-radius: 22px; }
+
+/* ── Trip setup modal ─────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.hidden { display: none; }
+.modal-box {
+  background: #fff; border-radius: 14px; padding: 28px 24px;
+  width: 100%; max-width: 480px; box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-box h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 18px; color: var(--primary-dark); }
+.modal-field { margin-bottom: 14px; }
+.modal-field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .03em; }
+.modal-field input, .modal-field select {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; font-size: 0.95rem; font-family: inherit;
+}
+.modal-field input:focus, .modal-field select:focus { outline: none; border-color: var(--primary); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+/* ── Share modal ──────────────────────────────────────────────────────────── */
+#shareUrl {
+  width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 0.85rem; font-family: monospace;
+  background: #f7fafc; color: var(--text);
+}
+.share-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; }
+
+/* ── Toast ────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #2d3748; color: #fff; padding: 10px 22px; border-radius: 22px;
+  font-size: 0.88rem; font-weight: 600; z-index: 999;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+  box-shadow: 0 4px 18px rgba(0,0,0,.22);
+}
+#toast.show { opacity: 1; pointer-events: auto; }
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  #topBar, #infoBanner, #addDayBar, .day-actions, #toast,
+  .modal-overlay, .add-flight-btn, .btn { display: none !important; }
+  body { background: #fff; }
+  .section-card, .day-card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  .activity-textarea { border: 1px solid #ccc; background: #fff; }
+  .status-select { border: 1px solid #ccc; background: #fff; }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media(max-width:600px) {
+  #topBar h1 { font-size: 1.05rem; }
+  #topActions { gap: 6px; }
+  .btn { padding: 6px 11px; font-size: 0.78rem; }
+  .section-header { font-size: 0.97rem; }
+  .day-date { font-size: 0.95rem; }
+  .day-theme-input { font-size: 0.88rem; }
+  .activity-top { flex-wrap: wrap; }
+  .status-select { min-width: 110px; }
+  #main { padding: 12px 8px 50px; }
+}
+
+/* ── Read-only / view mode ────────────────────────────────────────────────── */
+body.view-mode .field-input,
+body.view-mode .activity-textarea,
+body.view-mode .day-theme-input,
+body.view-mode .status-select { pointer-events: none; }
+body.view-mode #addDayBar,
+body.view-mode .day-actions,
+body.view-mode .add-flight-btn { display: none; }
+body.view-mode #infoBanner { display: flex; }
+
+/* ── Traveler chips ───────────────────────────────────────────────────────── */
+.traveler-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip {
+  padding: 2px 10px; background: rgba(255,255,255,.22); border-radius: 12px;
+  font-size: 0.78rem; cursor: default;
+}
+
+/* ── Scroll to top ────────────────────────────────────────────────────────── */
+#scrollTop {
+  position: fixed; bottom: 70px; right: 18px; width: 38px; height: 38px;
+  border-radius: 50%; background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); font-size: 1.1rem;
+  opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 99;
+  border: none;
+}
+#scrollTop.visible { opacity: 1; pointer-events: auto; }
+</style>
+</head>
+<body>
+
+<!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
+<div id="topBar">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div>
+      <h1 id="tripTitle" onclick="openTripSetup()">
+        <span>✈️</span>
+        <span id="tripTitleText">New Trip</span>
+        <span class="edit-pencil">✏️</span>
+      </h1>
+      <div id="tripMeta">
+        <span id="metaCountry"></span>
+        <span id="metaTravelers"></span>
+        <span id="metaDates"></span>
+      </div>
+    </div>
+    <div id="topActions">
+      <select id="langSelect" onchange="setLang(this.value)" title="Language">
+        <option value="en">🌐 EN</option>
+        <option value="zh">中文</option>
+        <option value="ko">한국어</option>
+        <option value="ja">日本語</option>
+        <option value="fr">FR</option>
+        <option value="de">DE</option>
+        <option value="es">ES</option>
+        <option value="th">ไทย</option>
+      </select>
+      <div id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncText">Saved</span></div>
+      <button class="btn btn-white" onclick="exportPDF()">📄 <span data-i18n="pdf">PDF</span></button>
+      <button class="btn btn-white" onclick="openShare()">🔗 <span data-i18n="share">Share</span></button>
+      <button class="btn btn-outline" onclick="openTripSetup()">⚙️ <span data-i18n="setup">Setup</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Info banner (view mode) ──────────────────────────────────────────────── -->
+<div id="infoBanner" class="hidden">
+  ✏️ <span data-i18n="viewBanner">This is a shared view. <strong>Tap any field to edit</strong>, then tap <strong>"PDF"</strong> to save your own copy.</span>
+  <button onclick="this.parentElement.classList.add('hidden')">✕</button>
+</div>
+
+<!-- ── Main content ─────────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Flight Schedule -->
+  <div class="section-card" id="flightSection">
+    <div class="section-header">
+      <span class="icon">✈️</span>
+      <span data-i18n="flightSchedule">Flight Schedule</span>
+    </div>
+    <div id="flightsList"></div>
+    <button class="add-flight-btn" onclick="addFlight()">
+      + <span data-i18n="addFlight">Add flight segment</span>
+    </button>
+  </div>
+
+  <!-- Day Plans -->
+  <div id="daysList"></div>
+
+  <!-- Add Day -->
+  <div id="addDayBar">
+    <button class="btn btn-primary" onclick="addDay()">
+      📅 <span data-i18n="addDay">Add day</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Trip Setup Modal ──────────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="setupModal">
+  <div class="modal-box">
+    <h2>⚙️ <span data-i18n="tripSetup">Trip Setup</span></h2>
+    <div class="modal-field">
+      <label data-i18n="tripName">Trip Name</label>
+      <input type="text" id="setupName" placeholder="e.g. Korea Trip Oct" />
+    </div>
+    <div class="modal-field">
+      <label data-i18n="destination">Destination / Country</label>
+      <input type="text" id="setupCountry" placeholder="e.g. Korea 🇰🇷" />
+    </div>
+    <div class="modal-field">
+      <label data-i18n="travelers">Travelers (one per line)</label>
+      <textarea id="setupTravelers" rows="3" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:.95rem;font-family:inherit;resize:vertical" placeholder="2 Adults&#10;1 Child (age 11)"></textarea>
+    </div>
+    <div class="modal-field">
+      <label data-i18n="tripStart">Trip Start Date</label>
+      <input type="date" id="setupStart" />
+    </div>
+    <div class="modal-field">
+      <label data-i18n="tripEnd">Trip End Date</label>
+      <input type="date" id="setupEnd" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-white" onclick="closeModal('setupModal')" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTripSetup()" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Share Modal ───────────────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="shareModal">
+  <div class="modal-box">
+    <h2>🔗 <span data-i18n="shareTrip">Share Trip</span></h2>
+    <p style="font-size:.88rem;color:var(--text-muted);margin-bottom:12px" data-i18n="shareDesc">Anyone with this link can view and edit your trip plan — data is stored in the cloud and loads on any device.</p>
+    <input type="text" id="shareUrl" readonly />
+    <p class="share-note" id="shareNote" data-i18n="shareNote">Link copied! Share it with your travel companions.</p>
+    <div style="margin-top:14px">
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px" data-i18n="shareCloud">
+        ☁️ Your data is auto-saved to the cloud. Open this link on any device.
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-white" onclick="closeModal('shareModal')" data-i18n="close">Close</button>
+      <button class="btn btn-primary" onclick="copyShareUrl()" data-i18n="copyLink">Copy Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── Scroll to top ─────────────────────────────────────────────────────────── -->
+<button id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- APP LOGIC                                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+// ── i18n strings ─────────────────────────────────────────────────────────────
+const I18N = {
+  en: {
+    flightSchedule: "Flight Schedule",
+    addFlight: "Add flight segment",
+    addDay: "Add day",
+    tripSetup: "Trip Setup",
+    tripName: "Trip Name",
+    destination: "Destination / Country",
+    travelers: "Travelers (one per line)",
+    tripStart: "Trip Start Date",
+    tripEnd: "Trip End Date",
+    cancel: "Cancel",
+    save: "Save",
+    close: "Close",
+    copyLink: "Copy Link",
+    shareTrip: "Share Trip",
+    shareDesc: "Anyone with this link can view and edit your trip plan in their browser.",
+    shareNote: "Link copied! Share it with your travel companions.",
+    shareCloud: "☁️ Your data is auto-saved to the cloud. Open this link on any device.",
+    pdf: "PDF",
+    share: "Share",
+    setup: "Setup",
+    viewBanner: 'This is a shared view. <strong>Tap any field to edit</strong>, then tap <strong>"PDF"</strong> to save your own copy.',
+    setStatus: "— Set status —",
+    booked: "Booked",
+    scheduled: "Scheduled",
+    noBook: "No Booking Available",
+    tbc: "TBC",
+    direct: "Direct",
+    connecting: "Connecting",
+    airline: "Airline",
+    flightNo: "Flight #",
+    from: "From (airport)",
+    to: "To (airport)",
+    departDate: "Depart date",
+    departTime: "Depart time",
+    arriveDate: "Arrive date",
+    arriveTime: "Arrive time",
+    terminal: "Terminal / Gate",
+    seats: "Seats",
+    removeFlight: "Remove flight",
+    removeDay: "Remove day",
+    hotel: "Hotel",
+    breakfast: "Breakfast",
+    amAct: "AM Activities",
+    lunch: "Lunch",
+    pmAct: "PM Activities",
+    dinner: "Dinner",
+    nightAct: "Night Activities",
+    dayAgenda: "Day agenda / theme",
+    addHotel: "Add hotel...",
+    addBreakfast: "Add breakfast...",
+    addAm: "Add am activities...",
+    addLunch: "Add lunch...",
+    addPm: "Add pm activities...",
+    addDinner: "Add dinner...",
+    addNight: "Add night activities...",
+    saved: "Saved",
+    saving: "Saving...",
+    savedLocal: "Saved locally",
+    pdfExporting: "Generating PDF...",
+    day: "Day",
+  },
+  zh: {
+    flightSchedule: "航班行程",
+    addFlight: "新增航班",
+    addDay: "新增日期",
+    tripSetup: "行程设置",
+    tripName: "行程名称",
+    destination: "目的地 / 国家",
+    travelers: "旅客（每行一位）",
+    tripStart: "出发日期",
+    tripEnd: "返回日期",
+    cancel: "取消",
+    save: "保存",
+    close: "关闭",
+    copyLink: "复制链接",
+    shareTrip: "分享行程",
+    shareDesc: "任何人都可以通过此链接在浏览器中查看和编辑您的行程。",
+    shareNote: "链接已复制！分享给您的旅行伙伴。",
+    shareCloud: "☁️ 您的数据已自动保存到云端，可在任意设备上打开。",
+    pdf: "PDF",
+    share: "分享",
+    setup: "设置",
+    viewBanner: '这是共享视图。<strong>点击任何字段可编辑</strong>，然后点击<strong>"PDF"</strong>保存您的副本。',
+    setStatus: "— 设置状态 —",
+    booked: "已预订",
+    scheduled: "已排期",
+    noBook: "无法预订",
+    tbc: "待确认",
+    direct: "直飞",
+    connecting: "转机",
+    airline: "航空公司",
+    flightNo: "航班号",
+    from: "出发地（机场）",
+    to: "目的地（机场）",
+    departDate: "出发日期",
+    departTime: "出发时间",
+    arriveDate: "到达日期",
+    arriveTime: "到达时间",
+    terminal: "航站楼 / 登机口",
+    seats: "座位号",
+    removeFlight: "删除航班",
+    removeDay: "删除此天",
+    hotel: "酒店",
+    breakfast: "早餐",
+    amAct: "上午活动",
+    lunch: "午餐",
+    pmAct: "下午活动",
+    dinner: "晚餐",
+    nightAct: "晚间活动",
+    dayAgenda: "当天主题 / 计划",
+    addHotel: "添加酒店...",
+    addBreakfast: "添加早餐...",
+    addAm: "添加上午活动...",
+    addLunch: "添加午餐...",
+    addPm: "添加下午活动...",
+    addDinner: "添加晚餐...",
+    addNight: "添加晚间活动...",
+    saved: "已保存",
+    saving: "保存中...",
+    savedLocal: "已本地保存",
+    pdfExporting: "正在生成PDF...",
+    day: "第",
+  },
+  ko: {
+    flightSchedule: "항공 일정",
+    addFlight: "항공편 추가",
+    addDay: "날짜 추가",
+    tripSetup: "여행 설정",
+    tripName: "여행 이름",
+    destination: "목적지 / 국가",
+    travelers: "여행자 (한 줄에 한 명)",
+    tripStart: "여행 시작일",
+    tripEnd: "여행 종료일",
+    cancel: "취소",
+    save: "저장",
+    close: "닫기",
+    copyLink: "링크 복사",
+    shareTrip: "여행 공유",
+    shareDesc: "이 링크를 통해 누구나 브라우저에서 여행 계획을 보고 편집할 수 있습니다.",
+    shareNote: "링크가 복사되었습니다! 여행 동반자와 공유하세요.",
+    shareCloud: "☁️ 데이터가 클라우드에 자동 저장됩니다. 모든 기기에서 열 수 있습니다.",
+    pdf: "PDF",
+    share: "공유",
+    setup: "설정",
+    viewBanner: '이것은 공유 보기입니다. <strong>필드를 탭하여 편집</strong>한 후 <strong>"PDF"</strong>를 탭하여 저장하세요.',
+    setStatus: "— 상태 설정 —",
+    booked: "예약됨",
+    scheduled: "예정됨",
+    noBook: "예약 불가",
+    tbc: "미정",
+    direct: "직항",
+    connecting: "경유",
+    airline: "항공사",
+    flightNo: "항공편 번호",
+    from: "출발지 (공항)",
+    to: "도착지 (공항)",
+    departDate: "출발 날짜",
+    departTime: "출발 시간",
+    arriveDate: "도착 날짜",
+    arriveTime: "도착 시간",
+    terminal: "터미널 / 게이트",
+    seats: "좌석",
+    removeFlight: "항공편 삭제",
+    removeDay: "날짜 삭제",
+    hotel: "호텔",
+    breakfast: "아침 식사",
+    amAct: "오전 활동",
+    lunch: "점심 식사",
+    pmAct: "오후 활동",
+    dinner: "저녁 식사",
+    nightAct: "야간 활동",
+    dayAgenda: "당일 주제 / 일정",
+    addHotel: "호텔 추가...",
+    addBreakfast: "아침 식사 추가...",
+    addAm: "오전 활동 추가...",
+    addLunch: "점심 식사 추가...",
+    addPm: "오후 활동 추가...",
+    addDinner: "저녁 식사 추가...",
+    addNight: "야간 활동 추가...",
+    saved: "저장됨",
+    saving: "저장 중...",
+    savedLocal: "로컬 저장됨",
+    pdfExporting: "PDF 생성 중...",
+    day: "Day",
+  },
+  ja: {
+    flightSchedule: "フライトスケジュール",
+    addFlight: "フライトを追加",
+    addDay: "日程を追加",
+    tripSetup: "旅行設定",
+    tripName: "旅行名",
+    destination: "目的地 / 国",
+    travelers: "旅行者（1行に1人）",
+    tripStart: "旅行開始日",
+    tripEnd: "旅行終了日",
+    cancel: "キャンセル",
+    save: "保存",
+    close: "閉じる",
+    copyLink: "リンクをコピー",
+    shareTrip: "旅行をシェア",
+    shareDesc: "このリンクで誰でもブラウザで旅行計画を閲覧・編集できます。",
+    shareNote: "リンクをコピーしました！旅行仲間とシェアしてください。",
+    shareCloud: "☁️ データはクラウドに自動保存されます。どのデバイスでも開けます。",
+    pdf: "PDF",
+    share: "シェア",
+    setup: "設定",
+    viewBanner: 'これは共有ビューです。<strong>フィールドをタップして編集</strong>し、<strong>「PDF」</strong>をタップして保存してください。',
+    setStatus: "— ステータス設定 —",
+    booked: "予約済み",
+    scheduled: "予定済み",
+    noBook: "予約不可",
+    tbc: "未定",
+    direct: "直行",
+    connecting: "乗り継ぎ",
+    airline: "航空会社",
+    flightNo: "フライト番号",
+    from: "出発地（空港）",
+    to: "目的地（空港）",
+    departDate: "出発日",
+    departTime: "出発時刻",
+    arriveDate: "到着日",
+    arriveTime: "到着時刻",
+    terminal: "ターミナル / ゲート",
+    seats: "座席",
+    removeFlight: "フライトを削除",
+    removeDay: "この日を削除",
+    hotel: "ホテル",
+    breakfast: "朝食",
+    amAct: "午前の活動",
+    lunch: "昼食",
+    pmAct: "午後の活動",
+    dinner: "夕食",
+    nightAct: "夜の活動",
+    dayAgenda: "当日のテーマ / アジェンダ",
+    addHotel: "ホテルを追加...",
+    addBreakfast: "朝食を追加...",
+    addAm: "午前の活動を追加...",
+    addLunch: "昼食を追加...",
+    addPm: "午後の活動を追加...",
+    addDinner: "夕食を追加...",
+    addNight: "夜の活動を追加...",
+    saved: "保存済み",
+    saving: "保存中...",
+    savedLocal: "ローカルに保存済み",
+    pdfExporting: "PDFを生成中...",
+    day: "Day",
+  },
+  fr: {
+    flightSchedule: "Programme de vol",
+    addFlight: "Ajouter un vol",
+    addDay: "Ajouter un jour",
+    tripSetup: "Configuration du voyage",
+    tripName: "Nom du voyage",
+    destination: "Destination / Pays",
+    travelers: "Voyageurs (un par ligne)",
+    tripStart: "Date de départ",
+    tripEnd: "Date de retour",
+    cancel: "Annuler",
+    save: "Enregistrer",
+    close: "Fermer",
+    copyLink: "Copier le lien",
+    shareTrip: "Partager le voyage",
+    shareDesc: "N'importe qui peut voir et modifier votre plan de voyage.",
+    shareNote: "Lien copié ! Partagez-le avec vos compagnons de voyage.",
+    shareCloud: "☁️ Données sauvegardées dans le cloud. Accessible sur tous les appareils.",
+    pdf: "PDF", share: "Partager", setup: "Config",
+    viewBanner: 'Vue partagée. <strong>Tapez un champ pour modifier</strong>.',
+    setStatus: "— Statut —", booked: "Réservé", scheduled: "Planifié",
+    noBook: "Non disponible", tbc: "À confirmer",
+    direct: "Direct", connecting: "Correspondance",
+    airline: "Compagnie", flightNo: "Vol n°", from: "Départ", to: "Arrivée",
+    departDate: "Date départ", departTime: "Heure départ",
+    arriveDate: "Date arrivée", arriveTime: "Heure arrivée",
+    terminal: "Terminal / Porte", seats: "Sièges",
+    removeFlight: "Supprimer vol", removeDay: "Supprimer jour",
+    hotel: "Hôtel", breakfast: "Petit-déjeuner", amAct: "Activités AM",
+    lunch: "Déjeuner", pmAct: "Activités PM", dinner: "Dîner", nightAct: "Soirée",
+    dayAgenda: "Thème / programme", addHotel: "Ajouter hôtel...",
+    addBreakfast: "Ajouter petit-déjeuner...", addAm: "Activités matin...",
+    addLunch: "Ajouter déjeuner...", addPm: "Activités après-midi...",
+    addDinner: "Ajouter dîner...", addNight: "Activités soirée...",
+    saved: "Sauvegardé", saving: "Sauvegarde...", savedLocal: "Sauvegardé localement",
+    pdfExporting: "Génération PDF...", day: "Jour",
+  },
+  de: {
+    flightSchedule: "Flugplan", addFlight: "Flug hinzufügen", addDay: "Tag hinzufügen",
+    tripSetup: "Reiseeinstellungen", tripName: "Reisename", destination: "Ziel / Land",
+    travelers: "Reisende (eine pro Zeile)", tripStart: "Reisebeginn", tripEnd: "Reiseende",
+    cancel: "Abbrechen", save: "Speichern", close: "Schließen",
+    copyLink: "Link kopieren", shareTrip: "Reise teilen",
+    shareDesc: "Jeder kann Ihren Reiseplan über diesen Link ansehen und bearbeiten.",
+    shareNote: "Link kopiert!", shareCloud: "☁️ Daten werden automatisch in der Cloud gespeichert.",
+    pdf: "PDF", share: "Teilen", setup: "Einstellungen",
+    viewBanner: 'Geteilte Ansicht. <strong>Tippen Sie ein Feld an, um es zu bearbeiten</strong>.',
+    setStatus: "— Status setzen —", booked: "Gebucht", scheduled: "Geplant",
+    noBook: "Nicht buchbar", tbc: "TBD",
+    direct: "Direkt", connecting: "Umsteigen",
+    airline: "Fluggesellschaft", flightNo: "Flugnummer", from: "Von", to: "Nach",
+    departDate: "Abflugdatum", departTime: "Abflugzeit",
+    arriveDate: "Ankunftsdatum", arriveTime: "Ankunftszeit",
+    terminal: "Terminal / Gate", seats: "Sitze",
+    removeFlight: "Flug entfernen", removeDay: "Tag entfernen",
+    hotel: "Hotel", breakfast: "Frühstück", amAct: "Vormittag",
+    lunch: "Mittagessen", pmAct: "Nachmittag", dinner: "Abendessen", nightAct: "Abend",
+    dayAgenda: "Tagesplan", addHotel: "Hotel hinzufügen...",
+    addBreakfast: "Frühstück hinzufügen...", addAm: "Vormittag hinzufügen...",
+    addLunch: "Mittagessen hinzufügen...", addPm: "Nachmittag hinzufügen...",
+    addDinner: "Abendessen hinzufügen...", addNight: "Abend hinzufügen...",
+    saved: "Gespeichert", saving: "Speichern...", savedLocal: "Lokal gespeichert",
+    pdfExporting: "PDF erstellen...", day: "Tag",
+  },
+  es: {
+    flightSchedule: "Itinerario de vuelos", addFlight: "Agregar vuelo", addDay: "Agregar día",
+    tripSetup: "Configuración del viaje", tripName: "Nombre del viaje", destination: "Destino / País",
+    travelers: "Viajeros (uno por línea)", tripStart: "Fecha de inicio", tripEnd: "Fecha de fin",
+    cancel: "Cancelar", save: "Guardar", close: "Cerrar",
+    copyLink: "Copiar enlace", shareTrip: "Compartir viaje",
+    shareDesc: "Cualquiera puede ver y editar tu plan de viaje con este enlace.",
+    shareNote: "¡Enlace copiado!", shareCloud: "☁️ Datos guardados en la nube.",
+    pdf: "PDF", share: "Compartir", setup: "Ajustes",
+    viewBanner: 'Vista compartida. <strong>Toca cualquier campo para editar</strong>.',
+    setStatus: "— Seleccionar estado —", booked: "Reservado", scheduled: "Programado",
+    noBook: "Sin disponibilidad", tbc: "Por confirmar",
+    direct: "Directo", connecting: "Con escala",
+    airline: "Aerolínea", flightNo: "Nº de vuelo", from: "Desde", to: "Hasta",
+    departDate: "Fecha salida", departTime: "Hora salida",
+    arriveDate: "Fecha llegada", arriveTime: "Hora llegada",
+    terminal: "Terminal / Puerta", seats: "Asientos",
+    removeFlight: "Eliminar vuelo", removeDay: "Eliminar día",
+    hotel: "Hotel", breakfast: "Desayuno", amAct: "Actividades AM",
+    lunch: "Almuerzo", pmAct: "Actividades PM", dinner: "Cena", nightAct: "Noche",
+    dayAgenda: "Tema / programa del día", addHotel: "Agregar hotel...",
+    addBreakfast: "Agregar desayuno...", addAm: "Agregar actividades AM...",
+    addLunch: "Agregar almuerzo...", addPm: "Agregar actividades PM...",
+    addDinner: "Agregar cena...", addNight: "Agregar actividades nocturnas...",
+    saved: "Guardado", saving: "Guardando...", savedLocal: "Guardado localmente",
+    pdfExporting: "Generando PDF...", day: "Día",
+  },
+  th: {
+    flightSchedule: "ตารางบิน", addFlight: "เพิ่มเที่ยวบิน", addDay: "เพิ่มวัน",
+    tripSetup: "ตั้งค่าการเดินทาง", tripName: "ชื่อทริป", destination: "ปลายทาง / ประเทศ",
+    travelers: "นักเดินทาง (หนึ่งคนต่อบรรทัด)", tripStart: "วันเริ่มต้น", tripEnd: "วันสิ้นสุด",
+    cancel: "ยกเลิก", save: "บันทึก", close: "ปิด",
+    copyLink: "คัดลอกลิงก์", shareTrip: "แชร์ทริป",
+    shareDesc: "ทุกคนสามารถดูและแก้ไขแผนการเดินทางผ่านลิงก์นี้",
+    shareNote: "คัดลอกลิงก์แล้ว!", shareCloud: "☁️ ข้อมูลบันทึกอัตโนมัติไปยังคลาวด์",
+    pdf: "PDF", share: "แชร์", setup: "ตั้งค่า",
+    viewBanner: 'มุมมองที่แชร์ <strong>แตะช่องใดก็ได้เพื่อแก้ไข</strong>',
+    setStatus: "— เลือกสถานะ —", booked: "จองแล้ว", scheduled: "กำหนดการ",
+    noBook: "ไม่มีการจอง", tbc: "รอยืนยัน",
+    direct: "ตรง", connecting: "แวะพัก",
+    airline: "สายการบิน", flightNo: "เลขที่เที่ยวบิน", from: "จาก", to: "ถึง",
+    departDate: "วันออกเดินทาง", departTime: "เวลาออกเดินทาง",
+    arriveDate: "วันถึง", arriveTime: "เวลาถึง",
+    terminal: "เทอร์มินัล / ประตู", seats: "ที่นั่ง",
+    removeFlight: "ลบเที่ยวบิน", removeDay: "ลบวัน",
+    hotel: "โรงแรม", breakfast: "อาหารเช้า", amAct: "กิจกรรมเช้า",
+    lunch: "อาหารกลางวัน", pmAct: "กิจกรรมบ่าย", dinner: "อาหารเย็น", nightAct: "กิจกรรมกลางคืน",
+    dayAgenda: "ธีม / กำหนดการของวัน", addHotel: "เพิ่มโรงแรม...",
+    addBreakfast: "เพิ่มอาหารเช้า...", addAm: "เพิ่มกิจกรรมเช้า...",
+    addLunch: "เพิ่มอาหารกลางวัน...", addPm: "เพิ่มกิจกรรมบ่าย...",
+    addDinner: "เพิ่มอาหารเย็น...", addNight: "เพิ่มกิจกรรมกลางคืน...",
+    saved: "บันทึกแล้ว", saving: "กำลังบันทึก...", savedLocal: "บันทึกในเครื่อง",
+    pdfExporting: "กำลังสร้าง PDF...", day: "วันที่",
+  },
+};
+
+// ── App state ─────────────────────────────────────────────────────────────────
+let currentLang = "en";
+let saveTimer = null;
+let tripId = null;
+let isViewMode = false;
+let unsubscribe = null;
+
+const state = {
+  trip: {
+    name: "New Trip",
+    country: "",
+    travelers: [],
+    startDate: "",
+    endDate: "",
+  },
+  flights: [],
+  days: [],
+};
+
+// ── i18n helper ───────────────────────────────────────────────────────────────
+function t(key) {
+  return (I18N[currentLang] || I18N.en)[key] || I18N.en[key] || key;
+}
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    if (key) el.innerHTML = t(key);
+  });
+  // Update placeholders in dynamic content
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+    el.placeholder = t(el.getAttribute("data-i18n-ph"));
+  });
+  renderAll();
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  applyI18n();
+}
+
+// ── URL / ID handling ─────────────────────────────────────────────────────────
+function getOrCreateTripId() {
+  const params = new URLSearchParams(window.location.search);
+  let id = params.get("trip");
+  if (!id) {
+    // Try to recover the last-used ID from localStorage (survives refresh on local file)
+    id = localStorage.getItem("tp_lastId") || null;
+  }
+  if (!id) {
+    id = "trip_" + Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
+  }
+  // Always keep the URL in sync so sharing works
+  const newUrl = window.location.pathname + "?trip=" + id;
+  if (!window.location.search.includes(id)) {
+    window.history.replaceState({}, "", newUrl);
+  }
+  // Persist the ID so refreshes without a URL param still recover it
+  try { localStorage.setItem("tp_lastId", id); } catch(e) {}
+  return id;
+}
+
+function getShareUrl() {
+  return window.location.href;
+}
+
+// ── Auto-save ─────────────────────────────────────────────────────────────────
+function scheduleSave() {
+  setSyncState("saving");
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;   // clear BEFORE doSave so re-renders don't see a pending timer
+    doSave();
+  }, 1200);
+}
+
+function setSyncState(s) {
+  const dot  = document.getElementById("syncDot");
+  const text = document.getElementById("syncText");
+  dot.style.background = "";  // reset any inline colour so CSS classes win
+  if (s === "saving") {
+    dot.className    = "sync-dot saving";
+    text.textContent = t("saving");
+  } else if (s === "saved") {
+    dot.className    = "sync-dot";
+    text.textContent = t("saved");
+  } else {
+    dot.className    = "sync-dot";
+    dot.style.background = "#f6ad55";
+    text.textContent = t("savedLocal");
+  }
+}
+
+async function doSave() {
+  const data = JSON.parse(JSON.stringify(state));
+  // Always persist to localStorage as offline fallback
+  try { localStorage.setItem("tp_" + tripId, JSON.stringify(data)); } catch(e) {}
+
+  // ── JSONBin cloud save ──────────────────────────────────────────────────
+  // Uses the bin ID stored alongside the trip ID.
+  // First save creates the bin; subsequent saves update it.
+  const binId = localStorage.getItem("tp_bin_" + tripId);
+  try {
+    let res;
+    if (binId) {
+      // Update existing bin
+      res = await fetch("https://api.jsonbin.io/v3/b/" + binId, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Bin-Versioning": "false" },
+        body: JSON.stringify(data)
+      });
+    } else {
+      // Create new bin (public = true so anyone with bin ID can read without API key)
+      res = await fetch("https://api.jsonbin.io/v3/b", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Bin-Name": (state.trip.name || "trip") + "_" + tripId.slice(-6),
+          "X-Bin-Private": "false"
+        },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const newBinId = json.metadata?.id;
+        if (newBinId) {
+          localStorage.setItem("tp_bin_" + tripId, newBinId);
+          // Embed bin ID into the URL so shared recipients can also load it
+          const url = new URL(window.location.href);
+          url.searchParams.set("bin", newBinId);
+          window.history.replaceState({}, "", url.toString());
+        }
+      }
+    }
+    if (res && res.ok) {
+      setSyncState("saved");
+      return;
+    }
+  } catch(e) {
+    console.warn("JSONBin save failed – data kept in localStorage:", e);
+  }
+
+  // ── Firebase fallback (if configured) ──────────────────────────────────
+  if (window._firebaseReady && window._fb) {
+    try {
+      const { db, doc, setDoc } = window._fb;
+      await setDoc(doc(db, "trips", tripId), { ...data, updatedAt: new Date().toISOString() });
+      setSyncState("saved");
+      return;
+    } catch(e) {
+      console.warn("Firebase save failed:", e);
+    }
+  }
+
+  setSyncState("local");
+}
+
+async function loadFromCloud() {
+  // Check URL for a bin ID (present when opening a shared link)
+  const params = new URLSearchParams(window.location.search);
+  const urlBinId = params.get("bin");
+  if (urlBinId) {
+    localStorage.setItem("tp_bin_" + tripId, urlBinId);
+  }
+  const binId = urlBinId || localStorage.getItem("tp_bin_" + tripId);
+
+  if (binId) {
+    try {
+      const res = await fetch("https://api.jsonbin.io/v3/b/" + binId + "/latest", {
+        headers: { "X-Access-Key": "" }   // public bin — no key needed to read
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.record;
+        Object.assign(state.trip, data.trip || {});
+        state.flights = data.flights || [];
+        state.days    = data.days    || [];
+        return;
+      }
+    } catch(e) {
+      console.warn("JSONBin load failed:", e);
+    }
+  }
+
+  // Firebase fallback
+  if (window._firebaseReady && window._fb) {
+    try {
+      const { db, doc, getDoc } = window._fb;
+      const snap = await getDoc(doc(db, "trips", tripId));
+      if (snap.exists()) {
+        const data = snap.data();
+        Object.assign(state.trip, data.trip || {});
+        state.flights = data.flights || [];
+        state.days    = data.days    || [];
+        return;
+      }
+    } catch(e) {
+      console.warn("Firebase load failed:", e);
+    }
+  }
+
+  loadFromLocal();
+}
+
+function loadFromLocal() {
+  try {
+    const raw = localStorage.getItem("tp_" + tripId);
+    if (raw) {
+      const data = JSON.parse(raw);
+      Object.assign(state.trip, data.trip || {});
+      state.flights = data.flights || [];
+      state.days    = data.days    || [];
+    }
+  } catch(e) {}
+}
+
+// ── Unique IDs ────────────────────────────────────────────────────────────────
+function uid() { return "_" + Math.random().toString(36).slice(2, 9); }
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+const WEEKDAYS = {
+  en: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+  zh: ["周日","周一","周二","周三","周四","周五","周六"],
+  ko: ["일","월","화","수","목","금","토"],
+  ja: ["日","月","火","水","木","金","土"],
+  fr: ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"],
+  de: ["So","Mo","Di","Mi","Do","Fr","Sa"],
+  es: ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"],
+  th: ["อา","จ","อ","พ","พฤ","ศ","ส"],
+};
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  const wd = (WEEKDAYS[currentLang] || WEEKDAYS.en)[d.getDay()];
+  return `${wd}, ${dateStr.replace(/-/g, "/")}`;
+}
+
+// ── Status helpers ────────────────────────────────────────────────────────────
+const STATUS_CLASS = { booked: "booked", scheduled: "scheduled", nobook: "nobook", tbc: "tbc", "": "" };
+const STATUS_KEYS  = { booked: "booked", scheduled: "scheduled", nobook: "noBook", tbc: "tbc" };
+
+function statusOptions(current) {
+  const opts = [
+    `<option value="">${t("setStatus")}</option>`,
+    `<option value="booked"${current==="booked"?" selected":""}>${t("booked")}</option>`,
+    `<option value="scheduled"${current==="scheduled"?" selected":""}>${t("scheduled")}</option>`,
+    `<option value="nobook"${current==="nobook"?" selected":""}>${t("noBook")}</option>`,
+    `<option value="tbc"${current==="tbc"?" selected":""}>${t("tbc")}</option>`,
+  ];
+  return opts.join("");
+}
+
+// ── Flight rendering ──────────────────────────────────────────────────────────
+function renderFlights() {
+  const el = document.getElementById("flightsList");
+  el.innerHTML = state.flights.map((f, i) => `
+    <div class="flight-segment" id="fl-${f.id}">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="flight-tag ${f.type==='connecting'?'tag-connecting':'tag-direct'}">
+            ${f.type === "connecting" ? "🔄 " + t("connecting") : "✈️ " + t("direct")}
+          </span>
+          <span class="flight-route">
+            ${f.from || "???"} → ${f.to || "???"}
+            ${f.departDate ? `<span style="font-size:.8rem;font-weight:400;color:var(--text-muted)">${formatDate(f.departDate)} ${f.departTime||""}</span>` : ""}
+          </span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:.75rem;color:var(--text-muted)">${t("connecting")}:</label>
+          <input type="checkbox" ${f.type==="connecting"?"checked":""} onchange="updateFlight('${f.id}','type',this.checked?'connecting':'direct')" />
+          <button class="btn btn-danger btn-sm" onclick="removeFlight('${f.id}')" title="${t('removeFlight')}">✕</button>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field-group">
+          <label class="field-label">${t("airline")}</label>
+          <input class="field-input" value="${esc(f.airline)}" placeholder="Cathay Pacific"
+            onchange="updateFlight('${f.id}','airline',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("flightNo")}</label>
+          <input class="field-input" value="${esc(f.flightNo)}" placeholder="CX410"
+            onchange="updateFlight('${f.id}','flightNo',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("from")}</label>
+          <input class="field-input" value="${esc(f.from)}" placeholder="HKG"
+            onchange="updateFlight('${f.id}','from',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("to")}</label>
+          <input class="field-input" value="${esc(f.to)}" placeholder="ICN"
+            onchange="updateFlight('${f.id}','to',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("departDate")}</label>
+          <input class="field-input" type="date" value="${f.departDate||""}"
+            onchange="updateFlight('${f.id}','departDate',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("departTime")}</label>
+          <input class="field-input" type="time" value="${f.departTime||""}"
+            onchange="updateFlight('${f.id}','departTime',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("arriveDate")}</label>
+          <input class="field-input" type="date" value="${f.arriveDate||""}"
+            onchange="updateFlight('${f.id}','arriveDate',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("arriveTime")}</label>
+          <input class="field-input" type="time" value="${f.arriveTime||""}"
+            onchange="updateFlight('${f.id}','arriveTime',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("terminal")}</label>
+          <input class="field-input" value="${esc(f.terminal)}" placeholder="T1"
+            onchange="updateFlight('${f.id}','terminal',this.value)" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">${t("seats")}</label>
+          <input class="field-input" value="${esc(f.seats)}" placeholder="12A, 12B"
+            onchange="updateFlight('${f.id}','seats',this.value)" />
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function addFlight() {
+  state.flights.push({
+    id: uid(), type: "direct",
+    airline: "", flightNo: "", from: "", to: "",
+    departDate: "", departTime: "", arriveDate: "", arriveTime: "",
+    terminal: "", seats: "",
+  });
+  renderFlights();
+  scheduleSave();
+}
+
+function removeFlight(id) {
+  state.flights = state.flights.filter(f => f.id !== id);
+  renderFlights();
+  scheduleSave();
+}
+
+function updateFlight(id, field, value) {
+  const f = state.flights.find(f => f.id === id);
+  if (f) { f[field] = value; renderFlightSummary(id); scheduleSave(); }
+}
+
+function renderFlightSummary(id) {
+  // Just re-render the header portion of the flight card without full re-render
+  renderFlights();
+}
+
+// ── Day rendering ─────────────────────────────────────────────────────────────
+const ACTIVITY_DEFS = [
+  { key: "hotel",     icon: "🏨", labelKey: "hotel",     phKey: "addHotel" },
+  { key: "breakfast", icon: "🌅", labelKey: "breakfast", phKey: "addBreakfast" },
+  { key: "amAct",     icon: "🎨", labelKey: "amAct",     phKey: "addAm" },
+  { key: "lunch",     icon: "🍜", labelKey: "lunch",     phKey: "addLunch" },
+  { key: "pmAct",     icon: "🎭", labelKey: "pmAct",     phKey: "addPm" },
+  { key: "dinner",    icon: "🍽️", labelKey: "dinner",    phKey: "addDinner" },
+  { key: "nightAct",  icon: "🌙", labelKey: "nightAct",  phKey: "addNight" },
+];
+
+function renderDays() {
+  const el = document.getElementById("daysList");
+  el.innerHTML = state.days.map((day, idx) => `
+    <div class="day-card" id="day-${day.id}">
+      <div class="day-header">
+        <div class="day-header-top">
+          <span class="day-badge">${t("day")} ${idx + 1}</span>
+          <div class="day-date">${formatDate(day.date)}</div>
+          <div class="day-actions">
+            <input type="date" value="${day.date||""}" class="field-input" style="font-size:.78rem;padding:4px 8px"
+              onchange="updateDay('${day.id}','date',this.value)" title="Change date" />
+            <button class="btn btn-danger btn-sm" onclick="removeDay('${day.id}')" title="${t('removeDay')}">🗑</button>
+          </div>
+        </div>
+        <div class="day-theme-row">
+          <textarea class="day-theme-input"
+            rows="1"
+            placeholder="${t("dayAgenda")}"
+            onchange="updateDay('${day.id}','theme',this.value)"
+            oninput="autoResize(this)"
+          >${esc(day.theme)}</textarea>
+        </div>
+      </div>
+      ${ACTIVITY_DEFS.map(act => `
+        <div class="activity-row">
+          <div class="activity-top">
+            <div class="activity-title"><span class="icon">${act.icon}</span>${t(act.labelKey)}</div>
+            <select class="status-select ${STATUS_CLASS[day.activities[act.key]?.status||''] || ''}"
+              onchange="updateActivity('${day.id}','${act.key}','status',this.value);this.className='status-select '+this.value">
+              ${statusOptions(day.activities[act.key]?.status||"")}
+            </select>
+          </div>
+          <textarea class="activity-textarea"
+            placeholder="${t(act.phKey)}"
+            onchange="updateActivity('${day.id}','${act.key}','notes',this.value)"
+            oninput="autoResize(this)"
+          >${esc(day.activities[act.key]?.notes||"")}</textarea>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+
+  // Auto-resize textareas
+  el.querySelectorAll("textarea").forEach(autoResize);
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  const minH = el.classList.contains("day-theme-input") ? 26 : 44;
+  el.style.height = Math.max(minH, el.scrollHeight) + "px";
+}
+
+function addDay() {
+  // Suggest next date after last day or trip start
+  let nextDate = "";
+  if (state.days.length > 0) {
+    const last = state.days[state.days.length - 1].date;
+    if (last) {
+      const d = new Date(last + "T00:00:00");
+      d.setDate(d.getDate() + 1);
+      nextDate = d.toISOString().slice(0, 10);
+    }
+  } else if (state.trip.startDate) {
+    nextDate = state.trip.startDate;
+  }
+
+  state.days.push({
+    id: uid(),
+    date: nextDate,
+    theme: "",
+    activities: {},
+  });
+  renderDays();
+  scheduleSave();
+  // Scroll to new day
+  setTimeout(() => {
+    const last = document.querySelector(".day-card:last-child");
+    if (last) last.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 100);
+}
+
+function removeDay(id) {
+  if (!confirm(t("removeDay") + "?")) return;
+  state.days = state.days.filter(d => d.id !== id);
+  renderDays();
+  scheduleSave();
+}
+
+function updateDay(id, field, value) {
+  const day = state.days.find(d => d.id === id);
+  if (day) {
+    day[field] = value;
+    if (field === "date") renderDays();
+    scheduleSave();
+  }
+}
+
+function updateActivity(dayId, actKey, field, value) {
+  const day = state.days.find(d => d.id === dayId);
+  if (!day) return;
+  if (!day.activities[actKey]) day.activities[actKey] = {};
+  day.activities[actKey][field] = value;
+  scheduleSave();
+}
+
+// ── Trip meta ─────────────────────────────────────────────────────────────────
+function renderTripMeta() {
+  document.getElementById("tripTitleText").textContent = state.trip.name || "New Trip";
+  document.getElementById("metaCountry").textContent   = state.trip.country || "";
+  document.getElementById("metaTravelers").textContent =
+    state.trip.travelers.length ? "👤 " + state.trip.travelers.join(" · ") : "";
+  const s = state.trip.startDate, e = state.trip.endDate;
+  document.getElementById("metaDates").textContent =
+    (s && e) ? `📅 ${s} → ${e}` : s ? `📅 ${s}` : "";
+  document.title = (state.trip.name || "Travel Planner") + " | Travel Planner";
+}
+
+function openTripSetup() {
+  document.getElementById("setupName").value      = state.trip.name;
+  document.getElementById("setupCountry").value   = state.trip.country;
+  document.getElementById("setupTravelers").value = state.trip.travelers.join("\n");
+  document.getElementById("setupStart").value     = state.trip.startDate;
+  document.getElementById("setupEnd").value       = state.trip.endDate;
+  document.getElementById("setupModal").classList.remove("hidden");
+}
+
+function saveTripSetup() {
+  state.trip.name      = document.getElementById("setupName").value.trim() || "New Trip";
+  state.trip.country   = document.getElementById("setupCountry").value.trim();
+  state.trip.travelers = document.getElementById("setupTravelers").value
+    .split("\n").map(s => s.trim()).filter(Boolean);
+  state.trip.startDate = document.getElementById("setupStart").value;
+  state.trip.endDate   = document.getElementById("setupEnd").value;
+  closeModal("setupModal");
+  renderTripMeta();
+  scheduleSave();
+}
+
+// ── Share ─────────────────────────────────────────────────────────────────────
+function openShare() {
+  document.getElementById("shareUrl").value = getShareUrl();
+  document.getElementById("shareNote").style.display = "none";
+  document.getElementById("shareModal").classList.remove("hidden");
+}
+
+function copyShareUrl() {
+  const el = document.getElementById("shareUrl");
+  el.select();
+  try {
+    navigator.clipboard.writeText(el.value).catch(() => document.execCommand("copy"));
+  } catch(e) { document.execCommand("copy"); }
+  document.getElementById("shareNote").style.display = "";
+  showToast("🔗 " + t("shareNote"));
+}
+
+// ── PDF export ────────────────────────────────────────────────────────────────
+function exportPDF() {
+  showToast("📄 " + t("pdfExporting"));
+  const el = document.getElementById("main");
+  const opt = {
+    margin:      [10, 10, 10, 10],
+    filename:    (state.trip.name || "trip") + ".pdf",
+    image:       { type: "jpeg", quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF:       { unit: "mm", format: "a4", orientation: "portrait" },
+    pagebreak:   { mode: ["avoid-all", "css"] },
+  };
+  if (typeof html2pdf !== "undefined") {
+    html2pdf().set(opt).from(el).save().then(() => showToast("✅ PDF downloaded!"));
+  } else {
+    window.print();
+  }
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.add("hidden");
+}
+
+// Close modal on overlay click
+document.addEventListener("click", e => {
+  if (e.target.classList.contains("modal-overlay")) {
+    e.target.classList.add("hidden");
+  }
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
+}
+
+// ── Escape HTML ───────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// ── Scroll to top button ──────────────────────────────────────────────────────
+window.addEventListener("scroll", () => {
+  const btn = document.getElementById("scrollTop");
+  btn.classList.toggle("visible", window.scrollY > 300);
+});
+
+// ── Full re-render ────────────────────────────────────────────────────────────
+function renderAll() {
+  renderTripMeta();
+  renderFlights();
+  renderDays();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  tripId = getOrCreateTripId();
+
+  // Wait briefly for Firebase module to finish (no-op if not configured)
+  if (!window._firebaseReady) {
+    await new Promise(resolve => {
+      const t = setTimeout(resolve, 800);  // max wait
+      document.addEventListener("firebaseReady", () => { clearTimeout(t); resolve(); }, { once: true });
+    });
+  }
+
+  await loadFromCloud();
+
+  // Seed a blank flight segment for brand new trips
+  if (state.flights.length === 0 && state.days.length === 0) {
+    state.flights.push({
+      id: uid(), type: "direct",
+      airline: "", flightNo: "", from: "", to: "",
+      departDate: "", departTime: "", arriveDate: "", arriveTime: "",
+      terminal: "", seats: "",
+    });
+  }
+
+  renderAll();
+  setSyncState("saved");
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
