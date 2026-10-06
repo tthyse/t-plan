@@ -196,6 +196,99 @@ body {
 }
 .add-flight-btn:hover { background: #ebf8ff; }
 
+/* ── Flight lookup ────────────────────────────────────────────────────────────── */
+.lookup-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  padding: 10px 14px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;
+  flex-wrap: wrap;
+}
+.lookup-row .field-label { color: #0369a1; }
+.btn-lookup {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; border: none; background: var(--primary); color: #fff;
+  transition: background .15s; white-space: nowrap;
+}
+.btn-lookup:hover { background: var(--primary-dark); }
+.btn-lookup:disabled { background: #a0aec0; cursor: not-allowed; }
+.lookup-status {
+  font-size: 0.78rem; padding: 3px 10px; border-radius: 10px; font-weight: 600;
+}
+.lookup-status.loading { background: #fef9c3; color: #854d0e; }
+.lookup-status.success { background: #dcfce7; color: #166534; }
+.lookup-status.error   { background: #fee2e2; color: #991b1b; }
+
+/* ── Date-time pair ───────────────────────────────────────────────────────────── */
+.datetime-pair {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+@media(max-width:500px){ .datetime-pair { grid-template-columns: 1fr; } }
+
+/* ── Discover panel ───────────────────────────────────────────────────────────── */
+.discover-panel {
+  border-top: 2px dashed var(--primary-light);
+  background: linear-gradient(135deg, #f0f9ff 0%, #f7fff7 100%);
+  padding: 14px 18px;
+  display: none;
+}
+.discover-panel.open { display: block; }
+.discover-search-row {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px;
+}
+.discover-search-row .field-group { flex: 1; min-width: 140px; }
+.btn-discover {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 16px; border-radius: 20px; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; border: none; background: linear-gradient(135deg,#06b6d4,#10b981);
+  color: #fff; transition: opacity .15s; white-space: nowrap;
+}
+.btn-discover:hover { opacity: .88; }
+.btn-discover:disabled { opacity: .5; cursor: not-allowed; }
+.discover-cats {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.cat-chip {
+  padding: 4px 12px; border-radius: 16px; font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: #fff;
+  transition: all .15s; color: var(--text);
+}
+.cat-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.discover-status {
+  font-size: 0.8rem; margin-bottom: 8px; min-height: 20px;
+  color: var(--text-muted); font-style: italic;
+}
+.discover-results {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 10px;
+  max-height: 420px; overflow-y: auto;
+}
+.result-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; display: flex; flex-direction: column; gap: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06); transition: box-shadow .15s;
+}
+.result-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); }
+.result-card-name { font-weight: 700; font-size: 0.9rem; color: var(--text); line-height: 1.3; }
+.result-card-cat  { font-size: 0.74rem; color: var(--primary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.result-card-addr { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
+.result-card-rate { font-size: 0.78rem; color: #d97706; }
+.result-card-link { font-size: 0.75rem; color: var(--primary); text-decoration: none; }
+.result-card-link:hover { text-decoration: underline; }
+.result-add-row   { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.btn-add-act {
+  padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--primary-light);
+  background: #ebf8ff; color: var(--primary-dark); transition: all .15s;
+  white-space: nowrap;
+}
+.btn-add-act:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn-discover-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 14px; font-size: 0.78rem; font-weight: 700;
+  cursor: pointer; border: 1.5px solid #10b981; background: #f0fdf4;
+  color: #065f46; transition: all .15s;
+}
+.btn-discover-toggle:hover { background: #10b981; color: #fff; }
+
 /* ── Day card ─────────────────────────────────────────────────────────────── */
 .day-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; }
 .day-header {
@@ -392,6 +485,7 @@ body.view-mode #infoBanner { display: flex; }
       <button class="btn btn-white" onclick="openShare()">🔗 <span data-i18n="share">Share</span></button>
       <button class="btn btn-outline" onclick="openTripSetup()">⚙️ <span data-i18n="setup">Setup</span></button>
       <button class="btn btn-reset" onclick="confirmReset()">🗑 <span data-i18n="reset">Reset</span></button>
+      <button class="btn btn-outline" onclick="openApiSettings()" title="API Settings">🔑</button>
     </div>
   </div>
 </div>
@@ -478,7 +572,28 @@ body.view-mode #infoBanner { display: flex; }
   </div>
 </div>
 
+<!-- ── API Settings Modal ────────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="apiModal">
+  <div class="modal-box">
+    <h2>🔑 <span data-i18n="apiSettings">Flight Lookup Settings</span></h2>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px" data-i18n="apiDesc">
+      Enter your free AviationStack API key to enable auto-fill of flight details.
+      Get one free at <a href="https://aviationstack.com" target="_blank" style="color:var(--primary)">aviationstack.com</a> (100 lookups/month free).
+    </p>
+    <div class="modal-field">
+      <label data-i18n="apiKey">AviationStack API Key</label>
+      <input type="text" id="apiKeyInput" placeholder="your_api_key_here" autocomplete="off" />
+    </div>
+    <div id="apiKeyStatus" style="font-size:.8rem;margin-top:6px;min-height:18px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-white" onclick="closeModal('apiModal')" data-i18n="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveApiKey()" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
 <div id="toast"></div>
 
 <!-- ── Scroll to top ─────────────────────────────────────────────────────────── -->
@@ -553,6 +668,39 @@ const I18N = {
     day: "Day",
     reset: "Reset",
     resetConfirm: "Reset everything? This will clear all flights, days and trip details. This cannot be undone.",
+    apiSettings: "Flight Lookup Settings",
+    apiDesc: "Enter your free AviationStack API key to enable auto-fill of flight details.",
+    apiKey: "AviationStack API Key",
+    apiKeySaved: "API key saved",
+    apiKeyCleared: "API key cleared",
+    noApiKey: "Please enter your AviationStack API key first",
+    lookupLabel: "Auto-fill flight",
+    lookupBtn: "Lookup",
+    lookupSearching: "Searching...",
+    lookupNoResult: "No flight found for this date and flight number",
+    lookupFailed: "Lookup failed",
+    enterFlightNo: "Please enter a flight number (e.g. CX410)",
+    enterDate: "Please enter the departure date",
+    discover: "Discover",
+    discoverLocation: "Location / Neighbourhood",
+    discoverLocationPh: "e.g. Myeong-dong, Seoul",
+    discoverKeyword: "Keyword (optional)",
+    discoverKeywordPh: "e.g. BBQ, cafe, museum",
+    discoverSearch: "Search",
+    discoverHint: "Enter a location and click Search to find places.",
+    discoverSearching: "Searching places...",
+    discoverNoResult: "No places found. Try a different location or keyword.",
+    discoverError: "Search failed. Please try again.",
+    discoverFound: "places found",
+    discoverAddTo: "Add to",
+    dcat_all: "🌏 All",
+    dcat_sights: "🏛 Sights",
+    dcat_food: "🍜 Food",
+    dcat_accommodation: "🏨 Stay",
+    dcat_shopping: "🛍 Shopping",
+    dcat_entertainment: "🎭 Fun",
+    dcat_nature: "🌿 Nature",
+    addedTo: "Added!",
   },
   zh: {
     flightSchedule: "航班行程",
@@ -617,6 +765,39 @@ const I18N = {
     day: "第",
     reset: "重置",
     resetConfirm: "重置所有内容？这将清除所有航班、日程和行程详情，且无法撤销。",
+    apiSettings: "航班查询设置",
+    apiDesc: "输入您的免费 AviationStack API 密钥以启用航班信息自动填充。",
+    apiKey: "AviationStack API 密钥",
+    apiKeySaved: "API 密钥已保存",
+    apiKeyCleared: "API 密钥已清除",
+    noApiKey: "请先输入您的 AviationStack API 密钥",
+    lookupLabel: "自动填充航班",
+    lookupBtn: "查询",
+    lookupSearching: "查询中...",
+    lookupNoResult: "未找到该日期和航班号的航班",
+    lookupFailed: "查询失败",
+    enterFlightNo: "请输入航班号（如 CX410）",
+    enterDate: "请输入出发日期",
+    discover: "探索",
+    discoverLocation: "地点 / 街区",
+    discoverLocationPh: "如：明洞，首尔",
+    discoverKeyword: "关键词（可选）",
+    discoverKeywordPh: "如：烤肉、咖啡、博物馆",
+    discoverSearch: "搜索",
+    discoverHint: "输入地点并点击搜索以发现附近景点。",
+    discoverSearching: "正在搜索...",
+    discoverNoResult: "未找到相关地点，请尝试其他关键词。",
+    discoverError: "搜索失败，请重试。",
+    discoverFound: "个结果",
+    discoverAddTo: "添加到",
+    dcat_all: "🌏 全部",
+    dcat_sights: "🏛 景点",
+    dcat_food: "🍜 美食",
+    dcat_accommodation: "🏨 住宿",
+    dcat_shopping: "🛍 购物",
+    dcat_entertainment: "🎭 娱乐",
+    dcat_nature: "🌿 自然",
+    addedTo: "已添加！",
   },
   ko: {
     flightSchedule: "항공 일정",
@@ -681,6 +862,39 @@ const I18N = {
     day: "Day",
     reset: "초기화",
     resetConfirm: "모든 항목을 초기화하시겠습니까? 모든 항공편, 일정 및 여행 정보가 삭제되며 되돌릴 수 없습니다.",
+    apiSettings: "항공편 조회 설정",
+    apiDesc: "항공편 정보 자동 입력을 위해 무료 AviationStack API 키를 입력하세요.",
+    apiKey: "AviationStack API 키",
+    apiKeySaved: "API 키가 저장되었습니다",
+    apiKeyCleared: "API 키가 삭제되었습니다",
+    noApiKey: "먼저 AviationStack API 키를 입력해주세요",
+    lookupLabel: "항공편 자동 입력",
+    lookupBtn: "조회",
+    lookupSearching: "검색 중...",
+    lookupNoResult: "해당 날짜와 항공편 번호의 항공편을 찾을 수 없습니다",
+    lookupFailed: "조회 실패",
+    enterFlightNo: "항공편 번호를 입력하세요 (예: CX410)",
+    enterDate: "출발 날짜를 입력하세요",
+    discover: "탐색",
+    discoverLocation: "위치 / 지역",
+    discoverLocationPh: "예: 명동, 서울",
+    discoverKeyword: "키워드 (선택)",
+    discoverKeywordPh: "예: BBQ, 카페, 박물관",
+    discoverSearch: "검색",
+    discoverHint: "위치를 입력하고 검색을 클릭하여 장소를 찾아보세요.",
+    discoverSearching: "장소 검색 중...",
+    discoverNoResult: "장소를 찾을 수 없습니다. 다른 위치나 키워드를 시도해보세요.",
+    discoverError: "검색 실패. 다시 시도해주세요.",
+    discoverFound: "개 결과",
+    discoverAddTo: "추가",
+    dcat_all: "🌏 전체",
+    dcat_sights: "🏛 명소",
+    dcat_food: "🍜 음식",
+    dcat_accommodation: "🏨 숙소",
+    dcat_shopping: "🛍 쇼핑",
+    dcat_entertainment: "🎭 엔터",
+    dcat_nature: "🌿 자연",
+    addedTo: "추가됨!",
   },
   ja: {
     flightSchedule: "フライトスケジュール",
@@ -745,6 +959,39 @@ const I18N = {
     day: "Day",
     reset: "リセット",
     resetConfirm: "すべてをリセットしますか？すべてのフライト、日程、旅行情報が削除され、元に戻すことはできません。",
+    apiSettings: "フライト検索設定",
+    apiDesc: "フライト情報の自動入力のため、無料の AviationStack API キーを入力してください。",
+    apiKey: "AviationStack API キー",
+    apiKeySaved: "APIキーを保存しました",
+    apiKeyCleared: "APIキーを削除しました",
+    noApiKey: "先にAviationStack APIキーを入力してください",
+    lookupLabel: "フライト自動入力",
+    lookupBtn: "検索",
+    lookupSearching: "検索中...",
+    lookupNoResult: "指定の日付・便名のフライトが見つかりませんでした",
+    lookupFailed: "検索失敗",
+    enterFlightNo: "便名を入力してください（例：CX410）",
+    enterDate: "出発日を入力してください",
+    discover: "発見",
+    discoverLocation: "場所 / エリア",
+    discoverLocationPh: "例：明洞、ソウル",
+    discoverKeyword: "キーワード（任意）",
+    discoverKeywordPh: "例：BBQ、カフェ、博物館",
+    discoverSearch: "検索",
+    discoverHint: "場所を入力して検索ボタンをクリックしてください。",
+    discoverSearching: "場所を検索中...",
+    discoverNoResult: "場所が見つかりませんでした。別のキーワードをお試しください。",
+    discoverError: "検索に失敗しました。再試行してください。",
+    discoverFound: "件見つかりました",
+    discoverAddTo: "追加",
+    dcat_all: "🌏 すべて",
+    dcat_sights: "🏛 観光",
+    dcat_food: "🍜 グルメ",
+    dcat_accommodation: "🏨 宿泊",
+    dcat_shopping: "🛍 ショッピング",
+    dcat_entertainment: "🎭 エンタメ",
+    dcat_nature: "🌿 自然",
+    addedTo: "追加しました！",
   },
   fr: {
     flightSchedule: "Programme de vol",
@@ -783,6 +1030,19 @@ const I18N = {
     saved: "Sauvegardé", saving: "Sauvegarde...", savedLocal: "Sauvegardé localement",
     pdfExporting: "Génération PDF...", day: "Jour",
     reset: "Réinitialiser", resetConfirm: "Tout réinitialiser ? Cela effacera tous les vols, jours et détails du voyage. Irréversible.",
+    apiSettings: "Paramètres de recherche de vol", apiDesc: "Entrez votre clé API AviationStack gratuite.",
+    apiKey: "Clé API AviationStack", apiKeySaved: "Clé API enregistrée", apiKeyCleared: "Clé API effacée",
+    noApiKey: "Veuillez d'abord entrer votre clé API", lookupLabel: "Auto-remplir le vol",
+    lookupBtn: "Rechercher", lookupSearching: "Recherche...", lookupNoResult: "Vol introuvable",
+    lookupFailed: "Échec de la recherche", enterFlightNo: "Entrez un numéro de vol (ex. CX410)",
+    enterDate: "Entrez la date de départ",
+    discover: "Découvrir", discoverLocation: "Lieu / Quartier", discoverLocationPh: "ex. Myeong-dong, Séoul",
+    discoverKeyword: "Mot-clé (optionnel)", discoverKeywordPh: "ex. BBQ, café, musée",
+    discoverSearch: "Rechercher", discoverHint: "Entrez un lieu et cliquez sur Rechercher.",
+    discoverSearching: "Recherche de lieux...", discoverNoResult: "Aucun lieu trouvé.",
+    discoverError: "Échec de la recherche.", discoverFound: "résultats", discoverAddTo: "Ajouter à",
+    dcat_all:"🌏 Tout", dcat_sights:"🏛 Sites", dcat_food:"🍜 Resto", dcat_accommodation:"🏨 Hébergement",
+    dcat_shopping:"🛍 Shopping", dcat_entertainment:"🎭 Loisirs", dcat_nature:"🌿 Nature", addedTo:"Ajouté!",
   },
   de: {
     flightSchedule: "Flugplan", addFlight: "Flug hinzufügen", addDay: "Tag hinzufügen",
@@ -811,6 +1071,19 @@ const I18N = {
     saved: "Gespeichert", saving: "Speichern...", savedLocal: "Lokal gespeichert",
     pdfExporting: "PDF erstellen...", day: "Tag",
     reset: "Zurücksetzen", resetConfirm: "Alles zurücksetzen? Alle Flüge, Tage und Reisedetails werden gelöscht. Nicht rückgängig zu machen.",
+    apiSettings: "Flugsuche Einstellungen", apiDesc: "Geben Sie Ihren kostenlosen AviationStack API-Schlüssel ein.",
+    apiKey: "AviationStack API-Schlüssel", apiKeySaved: "API-Schlüssel gespeichert", apiKeyCleared: "API-Schlüssel gelöscht",
+    noApiKey: "Bitte zuerst API-Schlüssel eingeben", lookupLabel: "Flug automatisch ausfüllen",
+    lookupBtn: "Suchen", lookupSearching: "Suche...", lookupNoResult: "Kein Flug gefunden",
+    lookupFailed: "Suche fehlgeschlagen", enterFlightNo: "Flugnummer eingeben (z.B. CX410)",
+    enterDate: "Abflugdatum eingeben",
+    discover: "Entdecken", discoverLocation: "Ort / Viertel", discoverLocationPh: "z.B. Myeong-dong, Seoul",
+    discoverKeyword: "Stichwort (optional)", discoverKeywordPh: "z.B. BBQ, Café, Museum",
+    discoverSearch: "Suchen", discoverHint: "Ort eingeben und Suchen klicken.",
+    discoverSearching: "Orte suchen...", discoverNoResult: "Keine Orte gefunden.",
+    discoverError: "Suche fehlgeschlagen.", discoverFound: "Ergebnisse", discoverAddTo: "Hinzufügen zu",
+    dcat_all:"🌏 Alle", dcat_sights:"🏛 Sehenswürd.", dcat_food:"🍜 Essen", dcat_accommodation:"🏨 Unterkunft",
+    dcat_shopping:"🛍 Shopping", dcat_entertainment:"🎭 Unterhaltung", dcat_nature:"🌿 Natur", addedTo:"Hinzugefügt!",
   },
   es: {
     flightSchedule: "Itinerario de vuelos", addFlight: "Agregar vuelo", addDay: "Agregar día",
@@ -839,6 +1112,19 @@ const I18N = {
     saved: "Guardado", saving: "Guardando...", savedLocal: "Guardado localmente",
     pdfExporting: "Generando PDF...", day: "Día",
     reset: "Reiniciar", resetConfirm: "¿Reiniciar todo? Se eliminarán todos los vuelos, días y detalles del viaje. No se puede deshacer.",
+    apiSettings: "Configuración de búsqueda de vuelos", apiDesc: "Ingresa tu clave API gratuita de AviationStack.",
+    apiKey: "Clave API de AviationStack", apiKeySaved: "Clave API guardada", apiKeyCleared: "Clave API eliminada",
+    noApiKey: "Por favor ingresa tu clave API primero", lookupLabel: "Autocompletar vuelo",
+    lookupBtn: "Buscar", lookupSearching: "Buscando...", lookupNoResult: "Vuelo no encontrado",
+    lookupFailed: "Búsqueda fallida", enterFlightNo: "Ingresa un número de vuelo (ej. CX410)",
+    enterDate: "Ingresa la fecha de salida",
+    discover: "Descubrir", discoverLocation: "Lugar / Barrio", discoverLocationPh: "ej. Myeong-dong, Seúl",
+    discoverKeyword: "Palabra clave (opcional)", discoverKeywordPh: "ej. BBQ, café, museo",
+    discoverSearch: "Buscar", discoverHint: "Ingresa un lugar y haz clic en Buscar.",
+    discoverSearching: "Buscando lugares...", discoverNoResult: "No se encontraron lugares.",
+    discoverError: "Búsqueda fallida.", discoverFound: "resultados", discoverAddTo: "Agregar a",
+    dcat_all:"🌏 Todo", dcat_sights:"🏛 Sitios", dcat_food:"🍜 Comida", dcat_accommodation:"🏨 Alojamiento",
+    dcat_shopping:"🛍 Compras", dcat_entertainment:"🎭 Diversión", dcat_nature:"🌿 Naturaleza", addedTo:"¡Agregado!",
   },
   th: {
     flightSchedule: "ตารางบิน", addFlight: "เพิ่มเที่ยวบิน", addDay: "เพิ่มวัน",
@@ -867,6 +1153,19 @@ const I18N = {
     saved: "บันทึกแล้ว", saving: "กำลังบันทึก...", savedLocal: "บันทึกในเครื่อง",
     pdfExporting: "กำลังสร้าง PDF...", day: "วันที่",
     reset: "รีเซ็ต", resetConfirm: "รีเซ็ตทั้งหมด? ข้อมูลเที่ยวบิน วันและรายละเอียดทั้งหมดจะถูกลบ ไม่สามารถกู้คืนได้",
+    apiSettings: "การตั้งค่าค้นหาเที่ยวบิน", apiDesc: "ใส่คีย์ API AviationStack ฟรีของคุณ",
+    apiKey: "คีย์ API AviationStack", apiKeySaved: "บันทึกคีย์ API แล้ว", apiKeyCleared: "ลบคีย์ API แล้ว",
+    noApiKey: "กรุณาใส่คีย์ API ก่อน", lookupLabel: "กรอกข้อมูลเที่ยวบินอัตโนมัติ",
+    lookupBtn: "ค้นหา", lookupSearching: "กำลังค้นหา...", lookupNoResult: "ไม่พบเที่ยวบิน",
+    lookupFailed: "ค้นหาล้มเหลว", enterFlightNo: "ใส่หมายเลขเที่ยวบิน (เช่น CX410)",
+    enterDate: "ใส่วันที่ออกเดินทาง",
+    discover: "ค้นพบ", discoverLocation: "สถานที่ / ย่าน", discoverLocationPh: "เช่น ย่านเมียงดง โซล",
+    discoverKeyword: "คีย์เวิร์ด (ไม่บังคับ)", discoverKeywordPh: "เช่น BBQ, คาเฟ่, พิพิธภัณฑ์",
+    discoverSearch: "ค้นหา", discoverHint: "ใส่สถานที่แล้วคลิกค้นหา",
+    discoverSearching: "กำลังค้นหาสถานที่...", discoverNoResult: "ไม่พบสถานที่ ลองคีย์เวิร์ดอื่น",
+    discoverError: "ค้นหาล้มเหลว กรุณาลองใหม่", discoverFound: "ผลลัพธ์", discoverAddTo: "เพิ่มไปที่",
+    dcat_all:"🌏 ทั้งหมด", dcat_sights:"🏛 สถานที่ท่องเที่ยว", dcat_food:"🍜 อาหาร", dcat_accommodation:"🏨 ที่พัก",
+    dcat_shopping:"🛍 ช้อปปิ้ง", dcat_entertainment:"🎭 บันเทิง", dcat_nature:"🌿 ธรรมชาติ", addedTo:"เพิ่มแล้ว!",
   },
 };
 
@@ -1136,14 +1435,16 @@ function renderFlights() {
   const el = document.getElementById("flightsList");
   el.innerHTML = state.flights.map((f, i) => `
     <div class="flight-segment" id="fl-${f.id}">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+
+      <!-- Header row: tag + route + controls -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="flight-tag ${f.type==='connecting'?'tag-connecting':'tag-direct'}">
             ${f.type === "connecting" ? "🔄 " + t("connecting") : "✈️ " + t("direct")}
           </span>
           <span class="flight-route">
             ${f.from || "???"} → ${f.to || "???"}
-            ${f.departDate ? `<span style="font-size:.8rem;font-weight:400;color:var(--text-muted)">${formatDate(f.departDate)} ${f.departTime||""}</span>` : ""}
+            ${f.departDate ? `<span style="font-size:.8rem;font-weight:400;color:var(--text-muted)">${formatDate(f.departDate)} ${f.departTime ? fmtTime(f.departTime) : ""}</span>` : ""}
           </span>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
@@ -1152,16 +1453,31 @@ function renderFlights() {
           <button class="btn btn-danger btn-sm" onclick="removeFlight('${f.id}')" title="${t('removeFlight')}">✕</button>
         </div>
       </div>
+
+      <!-- Lookup row -->
+      <div class="lookup-row">
+        <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
+          <span class="field-label" style="white-space:nowrap">🔍 ${t("lookupLabel")}</span>
+          <input class="field-input" id="ln-date-${f.id}" type="date" value="${f.departDate||""}"
+            style="max-width:160px" placeholder="${t("departDate")}"
+            onchange="updateFlight('${f.id}','departDate',this.value)" />
+          <input class="field-input" id="ln-fno-${f.id}" value="${esc(f.flightNo)}"
+            style="max-width:110px;text-transform:uppercase" placeholder="CX410"
+            oninput="this.value=this.value.toUpperCase()"
+            onchange="updateFlight('${f.id}','flightNo',this.value)" />
+          <button class="btn-lookup" onclick="lookupFlight('${f.id}')" id="lb-${f.id}">
+            ✈️ ${t("lookupBtn")}
+          </button>
+        </div>
+        <span class="lookup-status hidden" id="ls-${f.id}"></span>
+      </div>
+
+      <!-- Fields grid -->
       <div class="field-grid">
         <div class="field-group">
           <label class="field-label">${t("airline")}</label>
           <input class="field-input" value="${esc(f.airline)}" placeholder="Cathay Pacific"
             onchange="updateFlight('${f.id}','airline',this.value)" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">${t("flightNo")}</label>
-          <input class="field-input" value="${esc(f.flightNo)}" placeholder="CX410"
-            onchange="updateFlight('${f.id}','flightNo',this.value)" />
         </div>
         <div class="field-group">
           <label class="field-label">${t("from")}</label>
@@ -1174,26 +1490,6 @@ function renderFlights() {
             onchange="updateFlight('${f.id}','to',this.value)" />
         </div>
         <div class="field-group">
-          <label class="field-label">${t("departDate")}</label>
-          <input class="field-input" type="date" value="${f.departDate||""}"
-            onchange="updateFlight('${f.id}','departDate',this.value)" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">${t("departTime")}</label>
-          <input class="field-input" type="time" value="${f.departTime||""}"
-            onchange="updateFlight('${f.id}','departTime',this.value)" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">${t("arriveDate")}</label>
-          <input class="field-input" type="date" value="${f.arriveDate||""}"
-            onchange="updateFlight('${f.id}','arriveDate',this.value)" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">${t("arriveTime")}</label>
-          <input class="field-input" type="time" value="${f.arriveTime||""}"
-            onchange="updateFlight('${f.id}','arriveTime',this.value)" />
-        </div>
-        <div class="field-group">
           <label class="field-label">${t("terminal")}</label>
           <input class="field-input" value="${esc(f.terminal)}" placeholder="T1"
             onchange="updateFlight('${f.id}','terminal',this.value)" />
@@ -1204,6 +1500,29 @@ function renderFlights() {
             onchange="updateFlight('${f.id}','seats',this.value)" />
         </div>
       </div>
+
+      <!-- Depart / Arrive date+time pairs -->
+      <div class="field-grid" style="margin-top:10px">
+        <div class="field-group">
+          <label class="field-label">🛫 ${t("departDate")}</label>
+          <div class="datetime-pair">
+            <input class="field-input" type="date" value="${f.departDate||""}"
+              onchange="updateFlight('${f.id}','departDate',this.value)" />
+            <input class="field-input" type="time" value="${f.departTime||""}"
+              onchange="updateFlight('${f.id}','departTime',this.value)" />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">🛬 ${t("arriveDate")}</label>
+          <div class="datetime-pair">
+            <input class="field-input" type="date" value="${f.arriveDate||""}"
+              onchange="updateFlight('${f.id}','arriveDate',this.value)" />
+            <input class="field-input" type="time" value="${f.arriveTime||""}"
+              onchange="updateFlight('${f.id}','arriveTime',this.value)" />
+          </div>
+        </div>
+      </div>
+
     </div>
   `).join("");
 }
@@ -1231,8 +1550,148 @@ function updateFlight(id, field, value) {
 }
 
 function renderFlightSummary(id) {
-  // Just re-render the header portion of the flight card without full re-render
-  renderFlights();
+  renderFlights(); // full re-render keeps things simple
+}
+
+// Format 24h time to 12h display in flight header
+function fmtTime(t24) {
+  if (!t24) return "";
+  const [h, m] = t24.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12  = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
+}
+
+// ── API Key settings ──────────────────────────────────────────────────────────
+function openApiSettings() {
+  const saved = localStorage.getItem("tp_avstack_key") || "";
+  document.getElementById("apiKeyInput").value = saved;
+  const status = document.getElementById("apiKeyStatus");
+  status.textContent = saved ? "✅ API key saved" : "";
+  status.style.color = "#166534";
+  closeModal("setupModal");
+  document.getElementById("apiModal").classList.remove("hidden");
+}
+
+function saveApiKey() {
+  const key = document.getElementById("apiKeyInput").value.trim();
+  if (key) {
+    localStorage.setItem("tp_avstack_key", key);
+    showToast("🔑 " + t("apiKeySaved"));
+  } else {
+    localStorage.removeItem("tp_avstack_key");
+    showToast(t("apiKeyCleared"));
+  }
+  closeModal("apiModal");
+}
+
+// ── Flight lookup (AviationStack) ─────────────────────────────────────────────
+async function lookupFlight(id) {
+  const f = state.flights.find(fl => fl.id === id);
+  if (!f) return;
+
+  const apiKey = localStorage.getItem("tp_avstack_key") || "";
+  if (!apiKey) {
+    showToast("🔑 " + t("noApiKey"));
+    openApiSettings();
+    return;
+  }
+
+  const flightNo = (document.getElementById("ln-fno-" + id)?.value || f.flightNo || "").trim().toUpperCase();
+  const date     = document.getElementById("ln-date-" + id)?.value || f.departDate || "";
+
+  if (!flightNo) { showToast(t("enterFlightNo")); return; }
+  if (!date)     { showToast(t("enterDate"));     return; }
+
+  const btn = document.getElementById("lb-" + id);
+  const statusEl = document.getElementById("ls-" + id);
+  setLookupStatus(id, "loading", t("lookupSearching"));
+  btn.disabled = true;
+
+  // AviationStack free tier only supports HTTP — use a CORS proxy for browser requests
+  // allorigins.win is a reliable free proxy that rewrites to HTTPS internally
+  const iataCode = flightNo.replace(/[0-9]/g, "").toUpperCase();
+  const flightNum = flightNo.replace(/[^0-9]/g, "");
+  const apiUrl = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${encodeURIComponent(flightNo)}&flight_date=${date}`;
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+
+  try {
+    const res  = await fetch(proxyUrl);
+    if (!res.ok) throw new Error("Proxy request failed: " + res.status);
+    const outer = await res.json();
+    const data  = JSON.parse(outer.contents);
+
+    if (data.error) {
+      const msg = data.error.message || t("lookupFailed");
+      setLookupStatus(id, "error", msg);
+      btn.disabled = false;
+      return;
+    }
+
+    const flights = data.data || [];
+    if (flights.length === 0) {
+      setLookupStatus(id, "error", t("lookupNoResult"));
+      btn.disabled = false;
+      return;
+    }
+
+    // Pick the best match (first result, or match on date)
+    const match = flights.find(fl => fl.flight_date === date) || flights[0];
+
+    // Extract and map fields
+    const airline   = match.airline?.name || "";
+    const from      = match.departure?.iata || "";
+    const to        = match.arrival?.iata   || "";
+    const deptSched = match.departure?.scheduled || "";
+    const arrSched  = match.arrival?.scheduled   || "";
+    const terminal  = match.departure?.terminal  || f.terminal || "";
+    const gate      = match.departure?.gate      || "";
+
+    // Parse ISO datetime strings → date + time parts
+    function parseISO(iso) {
+      if (!iso) return { date: "", time: "" };
+      const d = new Date(iso);
+      const dateStr = d.toISOString().slice(0, 10);
+      const timeStr = d.toTimeString().slice(0, 5);
+      return { date: dateStr, time: timeStr };
+    }
+
+    const dept = parseISO(deptSched);
+    const arr  = parseISO(arrSched);
+
+    // Apply to state
+    const updates = {
+      airline,
+      flightNo:  match.flight?.iata || flightNo,
+      from,
+      to,
+      departDate: dept.date || date,
+      departTime: dept.time,
+      arriveDate: arr.date,
+      arriveTime: arr.time,
+      terminal:  terminal + (gate ? " / Gate " + gate : ""),
+    };
+    Object.assign(f, updates);
+
+    renderFlights();
+    scheduleSave();
+    setLookupStatus(id, "success",
+      `✅ ${airline} ${from} → ${to}  ${dept.time ? fmtTime(dept.time) : ""} → ${arr.time ? fmtTime(arr.time) : ""}`);
+
+  } catch(e) {
+    console.error("Flight lookup error:", e);
+    setLookupStatus(id, "error", t("lookupFailed") + ": " + e.message);
+  }
+
+  btn.disabled = false;
+}
+
+function setLookupStatus(id, type, msg) {
+  const el = document.getElementById("ls-" + id);
+  if (!el) return;
+  el.textContent  = msg;
+  el.className    = "lookup-status " + type;
+  el.classList.remove("hidden");
 }
 
 // ── Day rendering ─────────────────────────────────────────────────────────────
@@ -1255,6 +1714,9 @@ function renderDays() {
           <span class="day-badge">${t("day")} ${idx + 1}</span>
           <div class="day-date">${formatDate(day.date)}</div>
           <div class="day-actions">
+            <button class="btn-discover-toggle" onclick="toggleDiscover('${day.id}')" id="dtoggle-${day.id}">
+              🔍 <span data-i18n="discover">${t("discover")}</span>
+            </button>
             <input type="date" value="${day.date||""}" class="field-input" style="font-size:.78rem;padding:4px 8px"
               onchange="updateDay('${day.id}','date',this.value)" title="Change date" />
             <button class="btn btn-danger btn-sm" onclick="removeDay('${day.id}')" title="${t('removeDay')}">🗑</button>
@@ -1285,6 +1747,34 @@ function renderDays() {
           >${esc(day.activities[act.key]?.notes||"")}</textarea>
         </div>
       `).join("")}
+
+      <!-- Discover panel -->
+      <div class="discover-panel" id="dp-${day.id}">
+        <div class="discover-search-row">
+          <div class="field-group">
+            <label class="field-label">📍 ${t("discoverLocation")}</label>
+            <input class="field-input" id="dloc-${day.id}"
+              placeholder="${t("discoverLocationPh")}"
+              value="${esc(day.discoverLocation||state.trip.country||"")}" />
+          </div>
+          <div class="field-group" style="max-width:180px">
+            <label class="field-label">🔤 ${t("discoverKeyword")}</label>
+            <input class="field-input" id="dkw-${day.id}"
+              placeholder="${t("discoverKeywordPh")}" />
+          </div>
+          <button class="btn-discover" onclick="runDiscover('${day.id}')" id="dbtn-${day.id}">
+            🔍 ${t("discoverSearch")}
+          </button>
+        </div>
+        <div class="discover-cats" id="dcats-${day.id}">
+          ${["all","sights","food","accommodation","shopping","entertainment","nature"].map(c =>
+            `<span class="cat-chip${c==="all"?" active":""}" onclick="setDiscoverCat('${day.id}','${c}',this)">${t("dcat_"+c)}</span>`
+          ).join("")}
+        </div>
+        <div class="discover-status" id="dstatus-${day.id}">${t("discoverHint")}</div>
+        <div class="discover-results" id="dresults-${day.id}"></div>
+      </div>
+
     </div>
   `).join("");
 
@@ -1382,6 +1872,197 @@ function saveTripSetup() {
   closeModal("setupModal");
   renderTripMeta();
   scheduleSave();
+}
+
+// ── Discover ──────────────────────────────────────────────────────────────────
+// Category → OpenTripMap kinds mapping
+const OTM_KINDS = {
+  all:           "interesting_places",
+  sights:        "cultural,historic,architecture,museums,religion,natural",
+  food:          "restaurants,foods,cafes,fast_food",
+  accommodation: "accomodations",
+  shopping:      "shops,markets",
+  entertainment: "amusements,sport,adult_entertainment",
+  nature:        "natural,parks,beaches",
+};
+
+// Per-day discover state (category selection, last results)
+const discoverState = {};
+
+function toggleDiscover(dayId) {
+  const panel = document.getElementById("dp-" + dayId);
+  const btn   = document.getElementById("dtoggle-" + dayId);
+  if (!panel) return;
+  const isOpen = panel.classList.contains("open");
+  panel.classList.toggle("open", !isOpen);
+  btn.style.background = isOpen ? "" : "#10b981";
+  btn.style.color      = isOpen ? "" : "#fff";
+}
+
+function setDiscoverCat(dayId, cat, el) {
+  if (!discoverState[dayId]) discoverState[dayId] = { cat: "all" };
+  discoverState[dayId].cat = cat;
+  // Update chip UI
+  document.querySelectorAll(`#dcats-${dayId} .cat-chip`).forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+}
+
+async function runDiscover(dayId) {
+  const loc = (document.getElementById("dloc-" + dayId)?.value || "").trim();
+  const kw  = (document.getElementById("dkw-"  + dayId)?.value || "").trim();
+  if (!loc) { showToast("📍 " + t("discoverLocationPh")); return; }
+
+  const cat    = discoverState[dayId]?.cat || "all";
+  const btn    = document.getElementById("dbtn-"     + dayId);
+  const status = document.getElementById("dstatus-"  + dayId);
+  const resEl  = document.getElementById("dresults-" + dayId);
+
+  btn.disabled     = true;
+  status.textContent = t("discoverSearching");
+  resEl.innerHTML    = "";
+
+  try {
+    // 1. Geocode location text → lat/lon via Nominatim (free, no key)
+    const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`;
+    const geoRes = await fetch(geoUrl, { headers: { "Accept-Language": currentLang || "en" } });
+    const geoData = await geoRes.json();
+
+    if (!geoData.length) {
+      status.textContent = t("discoverNoResult");
+      btn.disabled = false;
+      return;
+    }
+
+    const { lat, lon, display_name } = geoData[0];
+
+    // 2. Fetch places from OpenTripMap (free, no key needed for basic requests)
+    const kinds  = OTM_KINDS[cat] || OTM_KINDS.all;
+    const radius = 3000; // 3km radius
+    const limit  = 20;
+    let otmUrl = `https://api.opentripmap.com/0.1/en/places/radius?radius=${radius}&lon=${lon}&lat=${lat}&kinds=${kinds}&limit=${limit}&format=json&apikey=5ae2e3f221c38a28845f05b67e1d1e09a72fa7ac27a2a23a65e7b4e1`;
+
+    // Append keyword filter if provided (filter by name client-side since OTM doesn't support freetext)
+    const otmRes  = await fetch(otmUrl);
+    const places  = await otmRes.json();
+
+    if (!Array.isArray(places) || places.length === 0) {
+      status.textContent = t("discoverNoResult");
+      btn.disabled = false;
+      return;
+    }
+
+    // Filter by keyword if given
+    let filtered = places;
+    if (kw) {
+      const kl = kw.toLowerCase();
+      filtered = places.filter(p =>
+        (p.name || "").toLowerCase().includes(kl) ||
+        (p.kinds || "").toLowerCase().includes(kl)
+      );
+      // If keyword filter returns nothing, show all with a note
+      if (filtered.length === 0) filtered = places;
+    }
+
+    // 3. Fetch details for top 15 (name + address)
+    const top = filtered.slice(0, 15);
+    const details = await Promise.all(top.map(async p => {
+      if (!p.xid) return p;
+      try {
+        const dr = await fetch(`https://api.opentripmap.com/0.1/en/places/xid/${p.xid}?apikey=5ae2e3f221c38a28845f05b67e1d1e09a72fa7ac27a2a23a65e7b4e1`);
+        return await dr.json();
+      } catch { return p; }
+    }));
+
+    // Store for add-to actions
+    discoverState[dayId] = { cat, results: details, loc };
+
+    // 4. Render cards
+    renderDiscoverResults(dayId, details, display_name);
+
+  } catch(e) {
+    console.error("Discover error:", e);
+    status.textContent = t("discoverError") + " (" + e.message + ")";
+  }
+
+  btn.disabled = false;
+}
+
+function renderDiscoverResults(dayId, places, areaName) {
+  const resEl  = document.getElementById("dresults-" + dayId);
+  const status = document.getElementById("dstatus-"  + dayId);
+
+  const valid = places.filter(p => p.name);
+  status.textContent = `${valid.length} ${t("discoverFound")} — ${areaName}`;
+
+  if (valid.length === 0) {
+    resEl.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">${t("discoverNoResult")}</p>`;
+    return;
+  }
+
+  // Activity targets for "Add to" buttons
+  const targets = [
+    { key: "breakfast", icon: "🌅" },
+    { key: "amAct",     icon: "🎨" },
+    { key: "lunch",     icon: "🍜" },
+    { key: "pmAct",     icon: "🎭" },
+    { key: "dinner",    icon: "🍽️" },
+    { key: "nightAct",  icon: "🌙" },
+  ];
+
+  resEl.innerHTML = valid.map((p, idx) => {
+    const name    = p.name || "";
+    const kinds   = (p.kinds || "").split(",").slice(0, 2).map(k => k.replace(/_/g," ")).join(" · ");
+    const addr    = p.address ? [p.address.road, p.address.city, p.address.country].filter(Boolean).join(", ") : "";
+    const rate    = p.rate ? "★".repeat(Math.min(p.rate, 5)) : "";
+    const wiki    = p.wikipedia ? `<a class="result-card-link" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia.split(":").pop())}" target="_blank">Wikipedia ↗</a>` : "";
+    const otmLink = p.xid ? `<a class="result-card-link" href="https://opentripmap.com/en/card/${p.xid}" target="_blank">More info ↗</a>` : "";
+    const addBtns = targets.map(tg =>
+      `<button class="btn-add-act" onclick="addDiscoverItem('${dayId}','${tg.key}',${idx})">${tg.icon} ${t(tg.key)}</button>`
+    ).join("");
+
+    return `
+      <div class="result-card" id="rc-${dayId}-${idx}">
+        <div class="result-card-name">${esc(name)}</div>
+        ${kinds ? `<div class="result-card-cat">${esc(kinds)}</div>` : ""}
+        ${rate  ? `<div class="result-card-rate">${rate}</div>` : ""}
+        ${addr  ? `<div class="result-card-addr">📍 ${esc(addr)}</div>` : ""}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">${wiki}${otmLink}</div>
+        <div class="result-add-row">${addBtns}</div>
+      </div>`;
+  }).join("");
+}
+
+function addDiscoverItem(dayId, actKey, idx) {
+  const ds  = discoverState[dayId];
+  if (!ds || !ds.results) return;
+  const p   = ds.results[idx];
+  if (!p)   return;
+
+  const day = state.days.find(d => d.id === dayId);
+  if (!day) return;
+  if (!day.activities[actKey]) day.activities[actKey] = {};
+
+  const name = p.name || "";
+  const addr = p.address
+    ? [p.address.road, p.address.city].filter(Boolean).join(", ")
+    : "";
+  const line = name + (addr ? "\n" + addr : "");
+
+  const existing = day.activities[actKey].notes || "";
+  day.activities[actKey].notes = existing
+    ? existing + "\n" + line
+    : line;
+
+  scheduleSave();
+  renderDays();
+
+  // Flash the card to confirm
+  const card = document.getElementById(`rc-${dayId}-${idx}`);
+  if (card) {
+    card.style.background = "#dcfce7";
+    setTimeout(() => { if (card) card.style.background = ""; }, 900);
+  }
+  showToast("✅ " + t("addedTo") + " " + name);
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
