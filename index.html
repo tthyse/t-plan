@@ -558,16 +558,30 @@ body.view-mode #infoBanner { display: flex; }
   <div class="modal-box">
     <h2>🔗 <span data-i18n="shareTrip">Share Trip</span></h2>
     <p style="font-size:.88rem;color:var(--text-muted);margin-bottom:12px" data-i18n="shareDesc">Anyone with this link can view and edit your trip plan — data is stored in the cloud and loads on any device.</p>
-    <input type="text" id="shareUrl" readonly />
-    <p class="share-note" id="shareNote" data-i18n="shareNote">Link copied! Share it with your travel companions.</p>
+
+    <!-- Full URL -->
+    <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">Full link</label>
+    <div style="display:flex;gap:6px;margin-top:4px;margin-bottom:10px">
+      <input type="text" id="shareUrl" readonly style="flex:1" />
+      <button class="btn btn-primary btn-sm" onclick="copyShareUrl()" data-i18n="copyLink">Copy</button>
+    </div>
+
+    <!-- Short URL -->
+    <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">Short link</label>
+    <div style="display:flex;gap:6px;margin-top:4px;margin-bottom:6px">
+      <input type="text" id="shortUrl" readonly placeholder="Click Shorten to generate..." style="flex:1;font-family:monospace;font-size:.85rem;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;background:#f7fafc;color:var(--text)" />
+      <button class="btn btn-primary btn-sm" onclick="shortenUrl()" id="shortenBtn">✂️ Shorten</button>
+      <button class="btn btn-white btn-sm" onclick="copyShortUrl()" id="copyShortBtn" style="display:none">Copy</button>
+    </div>
+    <p class="share-note" id="shareNote" style="display:none" data-i18n="shareNote">Link copied!</p>
+
     <div style="margin-top:14px">
-      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px" data-i18n="shareCloud">
-        ☁️ Your data is auto-saved to the cloud. Open this link on any device.
+      <p style="font-size:.82rem;color:var(--text-muted)" data-i18n="shareCloud">
+        ☁️ Your data is auto-saved. Open this link on any device.
       </p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-white" onclick="closeModal('shareModal')" data-i18n="close">Close</button>
-      <button class="btn btn-primary" onclick="copyShareUrl()" data-i18n="copyLink">Copy Link</button>
     </div>
   </div>
 </div>
@@ -1932,18 +1946,18 @@ function saveTripSetup() {
 }
 
 // ── Discover ──────────────────────────────────────────────────────────────────
-// Category → OpenTripMap kinds mapping
-const OTM_KINDS = {
-  all:           "interesting_places",
-  sights:        "cultural,historic,architecture,museums,religion,natural",
-  food:          "restaurants,foods,cafes,fast_food",
-  accommodation: "accomodations",
-  shopping:      "shops,markets",
-  entertainment: "amusements,sport,adult_entertainment",
-  nature:        "natural,parks,beaches",
+// Category → Overpass API OSM tags (free, no key, OpenStreetMap data)
+const OVERPASS_TAGS = {
+  all:           `node["tourism"](around:3000,{lat},{lon});node["amenity"~"restaurant|cafe|bar|fast_food|food_court"](around:3000,{lat},{lon});node["shop"~"mall|department_store|market"](around:3000,{lat},{lon});`,
+  sights:        `node["tourism"~"attraction|museum|artwork|monument|viewpoint|historic|gallery|theme_park|zoo"](around:3000,{lat},{lon});node["historic"](around:3000,{lat},{lon});`,
+  food:          `node["amenity"~"restaurant|cafe|bar|fast_food|food_court|bakery|pub|ice_cream"](around:3000,{lat},{lon});`,
+  accommodation: `node["tourism"~"hotel|hostel|guest_house|motel|apartment"](around:3000,{lat},{lon});`,
+  shopping:      `node["shop"](around:3000,{lat},{lon});node["amenity"="marketplace"](around:3000,{lat},{lon});`,
+  entertainment: `node["amenity"~"cinema|theatre|nightclub|karaoke|amusement_arcade"](around:3000,{lat},{lon});node["leisure"~"bowling_alley|miniature_golf|escape_game"](around:3000,{lat},{lon});`,
+  nature:        `node["tourism"~"viewpoint|camp_site|picnic_site"](around:3000,{lat},{lon});node["leisure"~"park|garden|nature_reserve|beach_resort"](around:3000,{lat},{lon});node["natural"~"beach|hot_spring|waterfall"](around:3000,{lat},{lon});`,
 };
 
-// Per-day discover state (category selection, last results)
+// Per-day discover state
 const discoverState = {};
 
 function toggleDiscover(dayId) {
@@ -1959,7 +1973,6 @@ function toggleDiscover(dayId) {
 function setDiscoverCat(dayId, cat, el) {
   if (!discoverState[dayId]) discoverState[dayId] = { cat: "all" };
   discoverState[dayId].cat = cat;
-  // Update chip UI
   document.querySelectorAll(`#dcats-${dayId} .cat-chip`).forEach(c => c.classList.remove("active"));
   el.classList.add("active");
 }
@@ -1974,14 +1987,14 @@ async function runDiscover(dayId) {
   const status = document.getElementById("dstatus-"  + dayId);
   const resEl  = document.getElementById("dresults-" + dayId);
 
-  btn.disabled     = true;
+  btn.disabled       = true;
   status.textContent = t("discoverSearching");
   resEl.innerHTML    = "";
 
   try {
-    // 1. Geocode location text → lat/lon via Nominatim (free, no key)
-    const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`;
-    const geoRes = await fetch(geoUrl, { headers: { "Accept-Language": currentLang || "en" } });
+    // Step 1 — Geocode via Nominatim (free, no key)
+    const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1&addressdetails=1`;
+    const geoRes  = await fetch(geoUrl, { headers: { "Accept-Language": "en" } });
     const geoData = await geoRes.json();
 
     if (!geoData.length) {
@@ -1992,53 +2005,69 @@ async function runDiscover(dayId) {
 
     const { lat, lon, display_name } = geoData[0];
 
-    // 2. Fetch places from OpenTripMap (free, no key needed for basic requests)
-    const kinds  = OTM_KINDS[cat] || OTM_KINDS.all;
-    const radius = 3000; // 3km radius
-    const limit  = 20;
-    let otmUrl = `https://api.opentripmap.com/0.1/en/places/radius?radius=${radius}&lon=${lon}&lat=${lat}&kinds=${kinds}&limit=${limit}&format=json&apikey=5ae2e3f221c38a28845f05b67e1d1e09a72fa7ac27a2a23a65e7b4e1`;
+    // Step 2 — Query Overpass API (free, no key, OpenStreetMap)
+    const tagQuery  = (OVERPASS_TAGS[cat] || OVERPASS_TAGS.all)
+                        .replace(/\{lat\}/g, lat).replace(/\{lon\}/g, lon);
+    const overpassQ = `[out:json][timeout:20];(${tagQuery});out body 40;`;
+    const overpassUrl = "https://overpass-api.de/api/interpreter";
 
-    // Append keyword filter if provided (filter by name client-side since OTM doesn't support freetext)
-    const otmRes  = await fetch(otmUrl);
-    const places  = await otmRes.json();
+    const ovRes  = await fetch(overpassUrl, {
+      method: "POST",
+      body:   "data=" + encodeURIComponent(overpassQ),
+    });
+    const ovData = await ovRes.json();
+    let elements = ovData.elements || [];
 
-    if (!Array.isArray(places) || places.length === 0) {
+    // Filter: must have a name
+    elements = elements.filter(e => e.tags?.name);
+
+    // Keyword filter
+    if (kw) {
+      const kl = kw.toLowerCase();
+      const kwFiltered = elements.filter(e =>
+        (e.tags.name || "").toLowerCase().includes(kl) ||
+        Object.values(e.tags).some(v => String(v).toLowerCase().includes(kl))
+      );
+      if (kwFiltered.length > 0) elements = kwFiltered;
+    }
+
+    // Deduplicate by name, limit to 20
+    const seen = new Set();
+    elements = elements.filter(e => {
+      const n = e.tags.name;
+      if (seen.has(n)) return false;
+      seen.add(n); return true;
+    }).slice(0, 20);
+
+    if (elements.length === 0) {
       status.textContent = t("discoverNoResult");
       btn.disabled = false;
       return;
     }
 
-    // Filter by keyword if given
-    let filtered = places;
-    if (kw) {
-      const kl = kw.toLowerCase();
-      filtered = places.filter(p =>
-        (p.name || "").toLowerCase().includes(kl) ||
-        (p.kinds || "").toLowerCase().includes(kl)
-      );
-      // If keyword filter returns nothing, show all with a note
-      if (filtered.length === 0) filtered = places;
-    }
+    // Map to display format
+    const places = elements.map(e => {
+      const tags    = e.tags || {};
+      const name    = tags.name || "";
+      // Build category label
+      const catLabel = tags.tourism || tags.amenity || tags.shop || tags.leisure || tags.historic || tags.natural || "";
+      // Build address
+      const addrParts = [tags["addr:housenumber"], tags["addr:street"], tags["addr:city"] || tags["addr:suburb"]].filter(Boolean);
+      const addr = addrParts.join(" ") || "";
+      // Links
+      const website = tags.website || tags["contact:website"] || "";
+      const phone   = tags.phone   || tags["contact:phone"]   || "";
+      const cuisine = tags.cuisine ? tags.cuisine.replace(/;/g, ", ") : "";
+      const opening = tags.opening_hours || "";
+      return { name, catLabel, addr, website, phone, cuisine, opening, lat: e.lat, lon: e.lon };
+    });
 
-    // 3. Fetch details for top 15 (name + address)
-    const top = filtered.slice(0, 15);
-    const details = await Promise.all(top.map(async p => {
-      if (!p.xid) return p;
-      try {
-        const dr = await fetch(`https://api.opentripmap.com/0.1/en/places/xid/${p.xid}?apikey=5ae2e3f221c38a28845f05b67e1d1e09a72fa7ac27a2a23a65e7b4e1`);
-        return await dr.json();
-      } catch { return p; }
-    }));
-
-    // Store for add-to actions
-    discoverState[dayId] = { cat, results: details, loc };
-
-    // 4. Render cards
-    renderDiscoverResults(dayId, details, display_name);
+    discoverState[dayId] = { cat, results: places, loc };
+    renderDiscoverResults(dayId, places, display_name);
 
   } catch(e) {
     console.error("Discover error:", e);
-    status.textContent = t("discoverError") + " (" + e.message + ")";
+    status.textContent = t("discoverError") + ": " + e.message;
   }
 
   btn.disabled = false;
@@ -2048,15 +2077,13 @@ function renderDiscoverResults(dayId, places, areaName) {
   const resEl  = document.getElementById("dresults-" + dayId);
   const status = document.getElementById("dstatus-"  + dayId);
 
-  const valid = places.filter(p => p.name);
-  status.textContent = `${valid.length} ${t("discoverFound")} — ${areaName}`;
+  status.textContent = `${places.length} ${t("discoverFound")} — ${areaName}`;
 
-  if (valid.length === 0) {
+  if (places.length === 0) {
     resEl.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">${t("discoverNoResult")}</p>`;
     return;
   }
 
-  // Activity targets for "Add to" buttons
   const targets = [
     { key: "breakfast", icon: "🌅" },
     { key: "amAct",     icon: "🎨" },
@@ -2066,24 +2093,24 @@ function renderDiscoverResults(dayId, places, areaName) {
     { key: "nightAct",  icon: "🌙" },
   ];
 
-  resEl.innerHTML = valid.map((p, idx) => {
-    const name    = p.name || "";
-    const kinds   = (p.kinds || "").split(",").slice(0, 2).map(k => k.replace(/_/g," ")).join(" · ");
-    const addr    = p.address ? [p.address.road, p.address.city, p.address.country].filter(Boolean).join(", ") : "";
-    const rate    = p.rate ? "★".repeat(Math.min(p.rate, 5)) : "";
-    const wiki    = p.wikipedia ? `<a class="result-card-link" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia.split(":").pop())}" target="_blank">Wikipedia ↗</a>` : "";
-    const otmLink = p.xid ? `<a class="result-card-link" href="https://opentripmap.com/en/card/${p.xid}" target="_blank">More info ↗</a>` : "";
-    const addBtns = targets.map(tg =>
+  resEl.innerHTML = places.map((p, idx) => {
+    const catLabel  = p.catLabel  ? `<div class="result-card-cat">${esc(p.catLabel.replace(/_/g," "))}</div>` : "";
+    const addrHtml  = p.addr      ? `<div class="result-card-addr">📍 ${esc(p.addr)}</div>`                   : "";
+    const cuisine   = p.cuisine   ? `<div class="result-card-addr">🍴 ${esc(p.cuisine)}</div>`                : "";
+    const opening   = p.opening   ? `<div class="result-card-addr">🕐 ${esc(p.opening)}</div>`                : "";
+    const webLink   = p.website   ? `<a class="result-card-link" href="${esc(p.website)}" target="_blank">🌐 Website</a>` : "";
+    const mapsLink  = (p.lat && p.lon)
+      ? `<a class="result-card-link" href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank">🗺 Maps</a>`
+      : "";
+    const addBtns   = targets.map(tg =>
       `<button class="btn-add-act" onclick="addDiscoverItem('${dayId}','${tg.key}',${idx})">${tg.icon} ${t(tg.key)}</button>`
     ).join("");
 
     return `
       <div class="result-card" id="rc-${dayId}-${idx}">
-        <div class="result-card-name">${esc(name)}</div>
-        ${kinds ? `<div class="result-card-cat">${esc(kinds)}</div>` : ""}
-        ${rate  ? `<div class="result-card-rate">${rate}</div>` : ""}
-        ${addr  ? `<div class="result-card-addr">📍 ${esc(addr)}</div>` : ""}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">${wiki}${otmLink}</div>
+        <div class="result-card-name">${esc(p.name)}</div>
+        ${catLabel}${addrHtml}${cuisine}${opening}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">${webLink}${mapsLink}</div>
         <div class="result-add-row">${addBtns}</div>
       </div>`;
   }).join("");
@@ -2099,27 +2126,21 @@ function addDiscoverItem(dayId, actKey, idx) {
   if (!day) return;
   if (!day.activities[actKey]) day.activities[actKey] = {};
 
-  const name = p.name || "";
-  const addr = p.address
-    ? [p.address.road, p.address.city].filter(Boolean).join(", ")
-    : "";
-  const line = name + (addr ? "\n" + addr : "");
+  const parts = [p.name, p.addr, p.cuisine ? "Cuisine: " + p.cuisine : "", p.website].filter(Boolean);
+  const line  = parts.join("\n");
 
   const existing = day.activities[actKey].notes || "";
-  day.activities[actKey].notes = existing
-    ? existing + "\n" + line
-    : line;
+  day.activities[actKey].notes = existing ? existing + "\n\n" + line : line;
 
   scheduleSave();
   renderDays();
 
-  // Flash the card to confirm
   const card = document.getElementById(`rc-${dayId}-${idx}`);
   if (card) {
     card.style.background = "#dcfce7";
     setTimeout(() => { if (card) card.style.background = ""; }, 900);
   }
-  showToast("✅ " + t("addedTo") + " " + name);
+  showToast("✅ " + t("addedTo") + " — " + p.name);
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
@@ -2163,19 +2184,76 @@ function confirmReset() {
 
 // ── Share ─────────────────────────────────────────────────────────────────────
 function openShare() {
-  document.getElementById("shareUrl").value = getShareUrl();
-  document.getElementById("shareNote").style.display = "none";
+  document.getElementById("shareUrl").value  = getShareUrl();
+  document.getElementById("shortUrl").value  = "";
+  document.getElementById("shareNote").style.display  = "none";
+  document.getElementById("copyShortBtn").style.display = "none";
   document.getElementById("shareModal").classList.remove("hidden");
 }
 
 function copyShareUrl() {
-  const el = document.getElementById("shareUrl");
-  el.select();
-  try {
-    navigator.clipboard.writeText(el.value).catch(() => document.execCommand("copy"));
-  } catch(e) { document.execCommand("copy"); }
+  const val = document.getElementById("shareUrl").value;
+  navigator.clipboard.writeText(val).catch(() => {
+    const el = document.getElementById("shareUrl");
+    el.select(); document.execCommand("copy");
+  });
   document.getElementById("shareNote").style.display = "";
   showToast("🔗 " + t("shareNote"));
+}
+
+async function shortenUrl() {
+  const longUrl = document.getElementById("shareUrl").value;
+  const btn     = document.getElementById("shortenBtn");
+  const input   = document.getElementById("shortUrl");
+
+  btn.textContent = "...";
+  btn.disabled    = true;
+  input.value     = "";
+
+  try {
+    // TinyURL API — free, no account, no key needed
+    const res = await fetch(
+      "https://tinyurl.com/api-create.php?url=" + encodeURIComponent(longUrl)
+    );
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const short = await res.text();
+    if (!short.startsWith("http")) throw new Error("Invalid response");
+
+    input.value = short.trim();
+    document.getElementById("copyShortBtn").style.display = "";
+    showToast("✅ Short link ready!");
+  } catch(e) {
+    // Fallback: try is.gd
+    try {
+      const res2 = await fetch(
+        "https://is.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl)
+      );
+      const short2 = await res2.text();
+      if (short2.startsWith("http")) {
+        input.value = short2.trim();
+        document.getElementById("copyShortBtn").style.display = "";
+        showToast("✅ Short link ready!");
+      } else {
+        throw new Error("is.gd failed");
+      }
+    } catch(e2) {
+      input.value = "Could not shorten — copy the full link above";
+      showToast("⚠️ Shortening failed, use the full link");
+    }
+  }
+
+  btn.textContent = "✂️ Shorten";
+  btn.disabled    = false;
+}
+
+function copyShortUrl() {
+  const val = document.getElementById("shortUrl").value;
+  navigator.clipboard.writeText(val).catch(() => {
+    const el = document.getElementById("shortUrl");
+    el.select(); document.execCommand("copy");
+  });
+  document.getElementById("shareNote").style.display = "";
+  showToast("🔗 Short link copied!");
 }
 
 // ── PDF export ────────────────────────────────────────────────────────────────
