@@ -361,6 +361,33 @@ body {
 }
 #addDayBar .btn { font-size: 0.95rem; padding: 10px 28px; border-radius: 22px; }
 
+/* ── Trip overview ────────────────────────────────────────────────────────── */
+#overviewList {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ov-row {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  transition: background .15s; text-decoration: none; color: var(--text);
+}
+.ov-row:hover { background: #f0f9ff; }
+.ov-badge {
+  background: var(--primary); color: #fff; border-radius: 14px;
+  padding: 2px 10px; font-size: 0.75rem; font-weight: 700;
+  white-space: nowrap; flex-shrink: 0; min-width: 52px; text-align: center;
+}
+.ov-date {
+  font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0;
+}
+.ov-theme {
+  font-size: 0.9rem; font-weight: 500; color: var(--text); flex: 1;
+  font-style: italic;
+}
+.ov-theme.empty { color: var(--text-muted); font-style: italic; }
+.ov-divider {
+  height: 1px; background: var(--border); margin: 2px 0;
+}
+
 /* ── Trip setup modal ─────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200;
@@ -509,6 +536,15 @@ body.view-mode #infoBanner { display: flex; }
     <button class="add-flight-btn" onclick="addFlight()">
       + <span data-i18n="addFlight">Add flight segment</span>
     </button>
+  </div>
+
+  <!-- Itinerary Overview -->
+  <div class="section-card" id="overviewSection" style="display:none">
+    <div class="section-header">
+      <span class="icon">🗓️</span>
+      <span data-i18n="overviewTitle">Trip Overview</span>
+    </div>
+    <div id="overviewList" style="padding:10px 18px 14px"></div>
   </div>
 
   <!-- Day Plans -->
@@ -682,6 +718,8 @@ const I18N = {
     day: "Day",
     reset: "Reset",
     resetConfirm: "Reset everything? This will clear all flights, days and trip details. This cannot be undone.",
+    overviewTitle: "Trip Overview",
+    ovNoTheme: "— no theme set —",
     apiSettings: "Flight Lookup Settings",
     apiDesc: "Enter your free AviationStack API key to enable auto-fill of flight details.",
     apiKey: "AviationStack API Key",
@@ -779,6 +817,8 @@ const I18N = {
     day: "第",
     reset: "重置",
     resetConfirm: "重置所有内容？这将清除所有航班、日程和行程详情，且无法撤销。",
+    overviewTitle: "行程总览",
+    ovNoTheme: "— 未设置主题 —",
     apiSettings: "航班查询设置",
     apiDesc: "输入您的免费 AviationStack API 密钥以启用航班信息自动填充。",
     apiKey: "AviationStack API 密钥",
@@ -876,6 +916,8 @@ const I18N = {
     day: "Day",
     reset: "초기화",
     resetConfirm: "모든 항목을 초기화하시겠습니까? 모든 항공편, 일정 및 여행 정보가 삭제되며 되돌릴 수 없습니다.",
+    overviewTitle: "여행 개요",
+    ovNoTheme: "— 테마 미설정 —",
     apiSettings: "항공편 조회 설정",
     apiDesc: "항공편 정보 자동 입력을 위해 무료 AviationStack API 키를 입력하세요.",
     apiKey: "AviationStack API 키",
@@ -973,6 +1015,8 @@ const I18N = {
     day: "Day",
     reset: "リセット",
     resetConfirm: "すべてをリセットしますか？すべてのフライト、日程、旅行情報が削除され、元に戻すことはできません。",
+    overviewTitle: "旅程概要",
+    ovNoTheme: "— テーマ未設定 —",
     apiSettings: "フライト検索設定",
     apiDesc: "フライト情報の自動入力のため、無料の AviationStack API キーを入力してください。",
     apiKey: "AviationStack API キー",
@@ -1044,6 +1088,7 @@ const I18N = {
     saved: "Sauvegardé", saving: "Sauvegarde...", savedLocal: "Sauvegardé localement",
     pdfExporting: "Génération PDF...", day: "Jour",
     reset: "Réinitialiser", resetConfirm: "Tout réinitialiser ? Cela effacera tous les vols, jours et détails du voyage. Irréversible.",
+    overviewTitle: "Aperçu du voyage", ovNoTheme: "— thème non défini —",
     apiSettings: "Paramètres de recherche de vol", apiDesc: "Entrez votre clé API AviationStack gratuite.",
     apiKey: "Clé API AviationStack", apiKeySaved: "Clé API enregistrée", apiKeyCleared: "Clé API effacée",
     noApiKey: "Veuillez d'abord entrer votre clé API", lookupLabel: "Auto-remplir le vol",
@@ -1085,6 +1130,7 @@ const I18N = {
     saved: "Gespeichert", saving: "Speichern...", savedLocal: "Lokal gespeichert",
     pdfExporting: "PDF erstellen...", day: "Tag",
     reset: "Zurücksetzen", resetConfirm: "Alles zurücksetzen? Alle Flüge, Tage und Reisedetails werden gelöscht. Nicht rückgängig zu machen.",
+    overviewTitle: "Reiseübersicht", ovNoTheme: "— kein Thema —",
     apiSettings: "Flugsuche Einstellungen", apiDesc: "Geben Sie Ihren kostenlosen AviationStack API-Schlüssel ein.",
     apiKey: "AviationStack API-Schlüssel", apiKeySaved: "API-Schlüssel gespeichert", apiKeyCleared: "API-Schlüssel gelöscht",
     noApiKey: "Bitte zuerst API-Schlüssel eingeben", lookupLabel: "Flug automatisch ausfüllen",
@@ -1126,6 +1172,7 @@ const I18N = {
     saved: "Guardado", saving: "Guardando...", savedLocal: "Guardado localmente",
     pdfExporting: "Generando PDF...", day: "Día",
     reset: "Reiniciar", resetConfirm: "¿Reiniciar todo? Se eliminarán todos los vuelos, días y detalles del viaje. No se puede deshacer.",
+    overviewTitle: "Resumen del viaje", ovNoTheme: "— sin tema —",
     apiSettings: "Configuración de búsqueda de vuelos", apiDesc: "Ingresa tu clave API gratuita de AviationStack.",
     apiKey: "Clave API de AviationStack", apiKeySaved: "Clave API guardada", apiKeyCleared: "Clave API eliminada",
     noApiKey: "Por favor ingresa tu clave API primero", lookupLabel: "Autocompletar vuelo",
@@ -1167,6 +1214,7 @@ const I18N = {
     saved: "บันทึกแล้ว", saving: "กำลังบันทึก...", savedLocal: "บันทึกในเครื่อง",
     pdfExporting: "กำลังสร้าง PDF...", day: "วันที่",
     reset: "รีเซ็ต", resetConfirm: "รีเซ็ตทั้งหมด? ข้อมูลเที่ยวบิน วันและรายละเอียดทั้งหมดจะถูกลบ ไม่สามารถกู้คืนได้",
+    overviewTitle: "ภาพรวมการเดินทาง", ovNoTheme: "— ยังไม่ได้ตั้งธีม —",
     apiSettings: "การตั้งค่าค้นหาเที่ยวบิน", apiDesc: "ใส่คีย์ API AviationStack ฟรีของคุณ",
     apiKey: "คีย์ API AviationStack", apiKeySaved: "บันทึกคีย์ API แล้ว", apiKeyCleared: "ลบคีย์ API แล้ว",
     noApiKey: "กรุณาใส่คีย์ API ก่อน", lookupLabel: "กรอกข้อมูลเที่ยวบินอัตโนมัติ",
@@ -1246,6 +1294,19 @@ function getOrCreateTripId() {
 }
 
 function getShareUrl() {
+  // Prefer the clean ?s= URL (no hash) if a blob ID is stored
+  const blobId = localStorage.getItem("tp_blob_" + tripId)
+              || localStorage.getItem("tp_blob");
+  if (blobId) {
+    const url = new URL(window.location.href);
+    url.hash = "";
+    url.searchParams.set("trip", tripId);
+    url.searchParams.set("s", blobId);
+    // Remove old params
+    url.searchParams.delete("bin");
+    url.searchParams.delete("nid");
+    return url.toString();
+  }
   return window.location.href;
 }
 
@@ -1918,6 +1979,7 @@ function updateDay(id, field, value) {
   const day = state.days.find(d => d.id === id);
   if (day) {
     day[field] = value;
+    if (field === "date" || field === "theme") renderOverview();
     if (field === "date") renderDays();
     scheduleSave();
   }
@@ -2204,12 +2266,16 @@ function confirmReset() {
 }
 
 // ── Share ─────────────────────────────────────────────────────────────────────
-function openShare() {
-  document.getElementById("shareUrl").value  = getShareUrl();
+async function openShare() {
   document.getElementById("shortUrl").value  = "";
-  document.getElementById("shareNote").style.display  = "none";
+  document.getElementById("shareNote").style.display   = "none";
   document.getElementById("copyShortBtn").style.display = "none";
+  document.getElementById("shortUrl").placeholder = "Click ✂️ Shorten to generate...";
   document.getElementById("shareModal").classList.remove("hidden");
+
+  // Force a cloud save first so the URL is as short as possible before showing
+  await doSave();
+  document.getElementById("shareUrl").value = getShareUrl();
 }
 
 function copyShareUrl() {
@@ -2230,54 +2296,59 @@ async function shortenUrl() {
   btn.textContent = "...";
   btn.disabled    = true;
   input.value     = "";
+  input.placeholder = "Generating...";
 
-  // Try multiple free shorteners via CORS proxy
+  // v.gd supports CORS from browsers — no proxy needed
   const attempts = [
-    // CleanURI — free, CORS-friendly
+    async () => {
+      const res = await fetch(
+        `https://v.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      const txt = (await res.text()).trim();
+      if (txt.startsWith("http")) return txt;
+      throw new Error(txt);
+    },
+    // is.gd same API, same CORS support
+    async () => {
+      const res = await fetch(
+        `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      const txt = (await res.text()).trim();
+      if (txt.startsWith("http")) return txt;
+      throw new Error(txt);
+    },
+    // cleanuri.com — CORS-friendly POST
     async () => {
       const res = await fetch("https://cleanuri.com/api/v1/shorten", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "url=" + encodeURIComponent(longUrl),
+        body:    "url=" + encodeURIComponent(longUrl),
+        signal:  AbortSignal.timeout(6000),
       });
       const j = await res.json();
       if (j.result_url) return j.result_url;
-      throw new Error("cleanuri failed");
-    },
-    // TinyURL via corsproxy
-    async () => {
-      const api = "https://tinyurl.com/api-create.php?url=" + encodeURIComponent(longUrl);
-      const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(api));
-      const txt = await res.text();
-      if (txt.startsWith("http")) return txt.trim();
-      throw new Error("tinyurl failed");
-    },
-    // is.gd via corsproxy
-    async () => {
-      const api = "https://is.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl);
-      const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(api));
-      const txt = await res.text();
-      if (txt.startsWith("http")) return txt.trim();
-      throw new Error("is.gd failed");
+      throw new Error(j.error || "cleanuri failed");
     },
   ];
 
   let short = null;
+  let lastErr = "";
   for (const attempt of attempts) {
-    try {
-      short = await attempt();
-      if (short) break;
-    } catch(e) { continue; }
+    try { short = await attempt(); if (short) break; }
+    catch(e) { lastErr = e.message; }
   }
 
   if (short) {
     input.value = short;
+    input.placeholder = "";
     document.getElementById("copyShortBtn").style.display = "";
     showToast("✅ Short link ready!");
   } else {
     input.value = "";
     input.placeholder = "Could not shorten — copy the full link above";
-    showToast("⚠️ Shortening failed — use the full link");
+    showToast("⚠️ " + lastErr);
   }
 
   btn.textContent = "✂️ Shorten";
@@ -2351,8 +2422,43 @@ window.addEventListener("scroll", () => {
 // ── Full re-render ────────────────────────────────────────────────────────────
 function renderAll() {
   renderTripMeta();
+  renderOverview();
   renderFlights();
   renderDays();
+}
+
+// ── Trip overview ─────────────────────────────────────────────────────────────
+function renderOverview() {
+  const section = document.getElementById("overviewSection");
+  const list    = document.getElementById("overviewList");
+  if (!section || !list) return;
+
+  if (state.days.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "";
+
+  list.innerHTML = state.days.map((day, idx) => {
+    const dayNum  = idx + 1;
+    const dateStr = day.date ? formatDate(day.date) : "";
+    const theme   = (day.theme || "").trim();
+    const isEmpty = !theme;
+
+    return `
+      <a class="ov-row" href="#day-${day.id}" onclick="scrollToDay('${day.id}')">
+        <span class="ov-badge">${t("day")} ${dayNum}</span>
+        ${dateStr ? `<span class="ov-date">${dateStr}</span>` : ""}
+        <span class="ov-theme ${isEmpty ? "empty" : ""}">${esc(theme) || t("ovNoTheme")}</span>
+      </a>`;
+  }).join("");
+}
+
+function scrollToDay(dayId) {
+  event.preventDefault();
+  const el = document.getElementById("day-" + dayId);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
