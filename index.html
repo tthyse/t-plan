@@ -1282,54 +1282,50 @@ async function doSave() {
   // 1. Always save to localStorage (own device persistence)
   try { localStorage.setItem("tp_" + tripId, JSON.stringify(data)); } catch(e) {}
 
-  // 2. Encode data into the URL hash so the share link is self-contained
-  //    Recipients open the link and their browser decodes it directly — no server needed
+  // 2. Save to jsonblob.com — free, no account, proper CORS, short IDs
   try {
-    const json    = JSON.stringify(data);
-    const encoded = btoa(encodeURIComponent(json));   // base64 encode
+    const blobId = localStorage.getItem("tp_blob_" + tripId)
+                || localStorage.getItem("tp_blob");
+    let res;
+    if (blobId) {
+      res = await fetch("https://jsonblob.com/api/jsonBlob/" + blobId, {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body:    JSON.stringify(data),
+      });
+    } else {
+      res = await fetch("https://jsonblob.com/api/jsonBlob", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body:    JSON.stringify(data),
+      });
+      if (res.ok) {
+        // ID is in the Location header: https://jsonblob.com/api/jsonBlob/<id>
+        const loc   = res.headers.get("Location") || "";
+        const newId = loc.split("/").pop();
+        if (newId) {
+          localStorage.setItem("tp_blob_" + tripId, newId);
+          localStorage.setItem("tp_blob",            newId);
+          // Short clean URL: just ?s=<id>  (no #data= hash)
+          const url = new URL(window.location.href);
+          url.searchParams.set("s", newId);
+          url.hash = "";   // clear old hash
+          window.history.replaceState({}, "", url.toString());
+        }
+      }
+    }
+    if (res && res.ok) { setSyncState("saved"); return; }
+  } catch(e) { console.warn("jsonblob save failed:", e); }
+
+  // 3. Hash fallback — encodes data in URL (makes URL long but always works)
+  try {
+    const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
     const url     = new URL(window.location.href);
     url.hash      = "data=" + encoded;
     window.history.replaceState({}, "", url.toString());
-  } catch(e) {
-    console.warn("URL encode failed:", e);
-  }
+  } catch(e) { console.warn("URL encode failed:", e); }
 
-  // 3. Also try npoint.io (free, no account, no key) for cross-device live sync
-  try {
-    const npointId = localStorage.getItem("tp_npoint_" + tripId);
-    if (npointId) {
-      // Update existing npoint document
-      const res = await fetch("https://api.npoint.io/" + npointId, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) { setSyncState("saved"); return; }
-    } else {
-      // Create new npoint document
-      const res = await fetch("https://api.npoint.io/bins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const nid  = json.id || json.token;
-        if (nid) {
-          localStorage.setItem("tp_npoint_" + tripId, nid);
-          localStorage.setItem("tp_npoint",            nid);
-          const url = new URL(window.location.href);
-          url.searchParams.set("nid", nid);
-          window.history.replaceState({}, "", url.toString());
-        }
-        setSyncState("saved"); return;
-      }
-    }
-  } catch(e) {
-    console.warn("npoint save failed:", e);
-  }
-
-  // 4. Firebase fallback (if configured)
+  // 4. Firebase (if configured)
   if (window._firebaseReady && window._fb) {
     try {
       const { db, doc, setDoc } = window._fb;
@@ -1338,7 +1334,6 @@ async function doSave() {
     } catch(e) { console.warn("Firebase save failed:", e); }
   }
 
-  // Data is always in localStorage + URL hash — sharing via Share button always works
   setSyncState("saved");
 }
 
@@ -1346,24 +1341,50 @@ async function loadFromCloud() {
   const params = new URLSearchParams(window.location.search);
   const hash   = window.location.hash;
 
-  // 1. Try loading from URL hash (self-contained share link — most reliable)
+  // 1. Try jsonblob (short URL ?s=<id>)
+  const sid = params.get("s")
+           || localStorage.getItem("tp_blob_" + tripId)
+           || localStorage.getItem("tp_blob");
+  if (sid) {
+    try {
+      const res = await fetch("https://jsonblob.com/api/jsonBlob/" + sid, {
+        headers: { "Accept": "application/json" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.trip || data.flights)) {
+          Object.assign(state.trip, data.trip    || {});
+          state.flights = data.flights || [];
+          state.days    = data.days    || [];
+          localStorage.setItem("tp_blob_" + tripId, sid);
+          localStorage.setItem("tp_blob",            sid);
+          // Clean up URL — only keep ?trip= and ?s=
+          const url = new URL(window.location.href);
+          url.searchParams.set("s", sid);
+          url.hash = "";
+          window.history.replaceState({}, "", url.toString());
+          return;
+        }
+      }
+    } catch(e) { console.warn("jsonblob load failed:", e); }
+  }
+
+  // 2. Hash fallback (old links with #data=)
   if (hash && hash.startsWith("#data=")) {
     try {
-      const encoded = hash.slice(6);
-      const json    = decodeURIComponent(atob(encoded));
-      const data    = JSON.parse(json);
+      const json = decodeURIComponent(atob(hash.slice(6)));
+      const data = JSON.parse(json);
       Object.assign(state.trip, data.trip    || {});
       state.flights = data.flights || [];
       state.days    = data.days    || [];
-      // Re-save to localStorage on this device
       try { localStorage.setItem("tp_" + tripId, JSON.stringify(data)); } catch(e) {}
+      // Migrate: save to jsonblob so future shares are short
+      scheduleSave();
       return;
-    } catch(e) {
-      console.warn("Hash decode failed:", e);
-    }
+    } catch(e) { console.warn("Hash decode failed:", e); }
   }
 
-  // 2. Try npoint.io (live sync across devices)
+  // 3. npoint fallback
   const nid = params.get("nid")
            || localStorage.getItem("tp_npoint_" + tripId)
            || localStorage.getItem("tp_npoint");
@@ -1376,15 +1397,13 @@ async function loadFromCloud() {
           Object.assign(state.trip, data.trip    || {});
           state.flights = data.flights || [];
           state.days    = data.days    || [];
-          localStorage.setItem("tp_npoint_" + tripId, nid);
-          localStorage.setItem("tp_npoint",            nid);
           return;
         }
       }
     } catch(e) { console.warn("npoint load failed:", e); }
   }
 
-  // 3. Firebase fallback
+  // 4. Firebase fallback
   if (window._firebaseReady && window._fb) {
     try {
       const { db, doc, getDoc } = window._fb;
@@ -1399,7 +1418,7 @@ async function loadFromCloud() {
     } catch(e) { console.warn("Firebase load failed:", e); }
   }
 
-  // 4. localStorage fallback (own device)
+  // 5. localStorage fallback
   loadFromLocal();
 }
 
@@ -2162,6 +2181,8 @@ function confirmReset() {
     localStorage.removeItem("tp_" + tripId);
     localStorage.removeItem("tp_bin_" + tripId);
     localStorage.removeItem("tp_binId");
+    localStorage.removeItem("tp_blob_" + tripId);
+    localStorage.removeItem("tp_blob");
     localStorage.removeItem("tp_npoint_" + tripId);
     localStorage.removeItem("tp_npoint");
     localStorage.removeItem("tp_lastId");
@@ -2210,36 +2231,53 @@ async function shortenUrl() {
   btn.disabled    = true;
   input.value     = "";
 
-  try {
-    // TinyURL API — free, no account, no key needed
-    const res = await fetch(
-      "https://tinyurl.com/api-create.php?url=" + encodeURIComponent(longUrl)
-    );
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const short = await res.text();
-    if (!short.startsWith("http")) throw new Error("Invalid response");
+  // Try multiple free shorteners via CORS proxy
+  const attempts = [
+    // CleanURI — free, CORS-friendly
+    async () => {
+      const res = await fetch("https://cleanuri.com/api/v1/shorten", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "url=" + encodeURIComponent(longUrl),
+      });
+      const j = await res.json();
+      if (j.result_url) return j.result_url;
+      throw new Error("cleanuri failed");
+    },
+    // TinyURL via corsproxy
+    async () => {
+      const api = "https://tinyurl.com/api-create.php?url=" + encodeURIComponent(longUrl);
+      const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(api));
+      const txt = await res.text();
+      if (txt.startsWith("http")) return txt.trim();
+      throw new Error("tinyurl failed");
+    },
+    // is.gd via corsproxy
+    async () => {
+      const api = "https://is.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl);
+      const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(api));
+      const txt = await res.text();
+      if (txt.startsWith("http")) return txt.trim();
+      throw new Error("is.gd failed");
+    },
+  ];
 
-    input.value = short.trim();
+  let short = null;
+  for (const attempt of attempts) {
+    try {
+      short = await attempt();
+      if (short) break;
+    } catch(e) { continue; }
+  }
+
+  if (short) {
+    input.value = short;
     document.getElementById("copyShortBtn").style.display = "";
     showToast("✅ Short link ready!");
-  } catch(e) {
-    // Fallback: try is.gd
-    try {
-      const res2 = await fetch(
-        "https://is.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl)
-      );
-      const short2 = await res2.text();
-      if (short2.startsWith("http")) {
-        input.value = short2.trim();
-        document.getElementById("copyShortBtn").style.display = "";
-        showToast("✅ Short link ready!");
-      } else {
-        throw new Error("is.gd failed");
-      }
-    } catch(e2) {
-      input.value = "Could not shorten — copy the full link above";
-      showToast("⚠️ Shortening failed, use the full link");
-    }
+  } else {
+    input.value = "";
+    input.placeholder = "Could not shorten — copy the full link above";
+    showToast("⚠️ Shortening failed — use the full link");
   }
 
   btn.textContent = "✂️ Shorten";
