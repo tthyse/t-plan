@@ -1302,12 +1302,14 @@ function getShareUrl() {
     url.hash = "";
     url.searchParams.set("trip", tripId);
     url.searchParams.set("s", blobId);
-    // Remove old params
     url.searchParams.delete("bin");
     url.searchParams.delete("nid");
     return url.toString();
   }
-  return window.location.href;
+  // Fallback — strip hash to keep it as short as possible
+  const url = new URL(window.location.href);
+  url.searchParams.set("trip", tripId);
+  return url.toString();
 }
 
 // ── Auto-save ─────────────────────────────────────────────────────────────────
@@ -2266,16 +2268,20 @@ function confirmReset() {
 }
 
 // ── Share ─────────────────────────────────────────────────────────────────────
-async function openShare() {
-  document.getElementById("shortUrl").value  = "";
-  document.getElementById("shareNote").style.display   = "none";
+function openShare() {
+  // Show modal immediately with whatever URL we have now
+  document.getElementById("shareUrl").value          = getShareUrl();
+  document.getElementById("shortUrl").value          = "";
+  document.getElementById("shortUrl").placeholder    = "Click ✂️ Shorten to generate...";
+  document.getElementById("shareNote").style.display = "none";
   document.getElementById("copyShortBtn").style.display = "none";
-  document.getElementById("shortUrl").placeholder = "Click ✂️ Shorten to generate...";
   document.getElementById("shareModal").classList.remove("hidden");
 
-  // Force a cloud save first so the URL is as short as possible before showing
-  await doSave();
-  document.getElementById("shareUrl").value = getShareUrl();
+  // Then try to get a cleaner cloud URL in the background and update the field
+  doSave().then(() => {
+    const clean = getShareUrl();
+    document.getElementById("shareUrl").value = clean;
+  }).catch(() => {});
 }
 
 function copyShareUrl() {
